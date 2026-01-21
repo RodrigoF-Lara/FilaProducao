@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Visualização de Dados - Google Sheets</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+        min-height: 100vh;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        overflow: hidden;
+      }
+
+      header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 30px;
+        text-align: center;
+      }
+
+      h1 {
+        font-size: 2em;
+        margin-bottom: 10px;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 50px;
+        font-size: 1.2em;
+        color: #667eea;
+      }
+
+      .table-container {
+        overflow-x: auto;
+        padding: 20px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 600px;
+      }
+
+      thead {
+        background: #667eea;
+        color: white;
+      }
+
+      th {
+        padding: 15px;
+        text-align: left;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.9em;
+        letter-spacing: 0.5px;
+      }
+
+      td {
+        padding: 12px 15px;
+        border-bottom: 1px solid #e0e0e0;
+      }
+
+      tbody tr:hover {
+        background-color: #f5f5f5;
+        transition: background-color 0.3s ease;
+      }
+
+      tbody tr:nth-child(even) {
+        background-color: #fafafa;
+      }
+
+      .error {
+        color: #d32f2f;
+        padding: 30px;
+        text-align: center;
+        font-size: 1.1em;
+      }
+
+      .refresh-btn {
+        background: #667eea;
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1em;
+        margin: 20px;
+        transition: background 0.3s ease;
+      }
+
+      .refresh-btn:hover {
+        background: #5568d3;
+      }
+
+      .tabs-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 20px 20px 0 20px;
+        border-bottom: 2px solid #e0e0e0;
+      }
+
+      .tab {
+        padding: 12px 24px;
+        background: #f5f5f5;
+        border: none;
+        border-radius: 8px 8px 0 0;
+        cursor: pointer;
+        font-size: 1em;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        color: #666;
+      }
+
+      .tab:hover {
+        background: #e0e0e0;
+      }
+
+      .tab.active {
+        background: #667eea;
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+      }
+
+      .count-badge {
+        background: rgba(255, 255, 255, 0.3);
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.85em;
+        margin-left: 8px;
+      }
+
+      .tab.active .count-badge {
+        background: rgba(255, 255, 255, 0.4);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>📊 Visualização de Dados</h1>
+        <p>Dados do Google Sheets</p>
+      </header>
+
+      <div id="tabs" class="tabs-container">
+        <!-- Abas serão geradas dinamicamente -->
+      </div>
+
+      <button class="refresh-btn" onclick="loadData()">
+        🔄 Atualizar Dados
+      </button>
+
+      <div id="content">
+        <div class="loading">Carregando dados...</div>
+      </div>
+    </div>
+
+    <script>
+      // URL direta do CSV publicado
+      const CSV_URL =
+        "https://docs.google.com/spreadsheets/d/e/2PACX-1vRl50RmRgO05pH3Y8YH7-Bgp-Xb48JvcWz9Du86jZL3qMwrOTRaMFq5M9f1jgvBV2Yi8_tE81dd524N/pub?output=csv";
+
+      let allData = [];
+      let currentFilter = "TODOS";
+
+      function parseCSV(csv) {
+        const lines = csv.split("\n");
+        const result = [];
+
+        for (let line of lines) {
+          if (line.trim()) {
+            // Parse CSV considerando valores entre aspas
+            const values = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+            result.push(values.map((val) => val.replace(/^"|"$/g, "").trim()));
+          }
+        }
+
+        return result;
+      }
+
+      function createTabs(data) {
+        const tabsDiv = document.getElementById("tabs");
+        const headers = data[0];
+        const rows = data.slice(1);
+
+        // Encontrar o índice da coluna "Destino"
+        const destinoIndex = headers.findIndex((h) =>
+          h.toLowerCase().includes("destino"),
+        );
+
+        if (destinoIndex === -1) {
+          tabsDiv.innerHTML = "";
+          return;
+        }
+
+        // Extrair valores únicos da coluna Destino
+        const destinos = new Set();
+        rows.forEach((row) => {
+          const destino = row[destinoIndex];
+          if (destino && destino.trim()) {
+            destinos.add(destino.trim());
+          }
+        });
+
+        // Criar abas
+        let tabsHTML = "";
+        const destinosSorted = ["TODOS", ...Array.from(destinos).sort()];
+
+        destinosSorted.forEach((destino) => {
+          const count =
+            destino === "TODOS"
+              ? rows.length
+              : rows.filter(
+                  (row) =>
+                    row[destinoIndex] && row[destinoIndex].trim() === destino,
+                ).length;
+          const activeClass = destino === currentFilter ? "active" : "";
+          tabsHTML += `<button class="tab ${activeClass}" onclick="filterByDestino('${destino}')">
+                    ${destino} <span class="count-badge">${count}</span>
+                </button>`;
+        });
+
+        tabsDiv.innerHTML = tabsHTML;
+      }
+
+      function filterByDestino(destino) {
+        currentFilter = destino;
+        displayData(allData);
+      }
+
+      function displayData(data) {
+        const contentDiv = document.getElementById("content");
+
+        if (data.length === 0) {
+          contentDiv.innerHTML =
+            '<div class="error">Nenhum dado encontrado.</div>';
+          return;
+        }
+
+        const headers = data[0];
+        let rows = data.slice(1);
+
+        // Filtrar por destino se não for "TODOS"
+        if (currentFilter !== "TODOS") {
+          const destinoIndex = headers.findIndex((h) =>
+            h.toLowerCase().includes("destino"),
+          );
+          if (destinoIndex !== -1) {
+            rows = rows.filter(
+              (row) =>
+                row[destinoIndex] && row[destinoIndex].trim() === currentFilter,
+            );
+          }
+        }
+
+        // Criar abas
+        createTabs(data);
+
+        let html = '<div class="table-container"><table>';
+
+        // Cabeçalho
+        html += "<thead><tr>";
+        headers.forEach((header) => {
+          html += `<th>${header}</th>`;
+        });
+        html += "</tr></thead>";
+
+        // Corpo da tabela
+        html += "<tbody>";
+        if (rows.length === 0) {
+          html += `<tr><td colspan="${headers.length}" style="text-align: center; padding: 30px; color: #999;">Nenhum dado encontrado para ${currentFilter}</td></tr>`;
+        } else {
+          rows.forEach((row) => {
+            html += "<tr>";
+            headers.forEach((_, index) => {
+              html += `<td>${row[index] || ""}</td>`;
+            });
+            html += "</tr>";
+          });
+        }
+        html += "</tbody></table></div>";
+
+        contentDiv.innerHTML = html;
+      }
+
+      async function loadData() {
+        const contentDiv = document.getElementById("content");
+        const tabsDiv = document.getElementById("tabs");
+        contentDiv.innerHTML = '<div class="loading">Carregando dados...</div>';
+        tabsDiv.innerHTML = "";
+
+        try {
+          const response = await fetch(CSV_URL, {
+            method: "GET",
+            mode: "cors",
+            cache: "no-cache",
+          });
+
+          if (!response.ok) {
+            throw new Error(`Erro HTTP: ${response.status}`);
+          }
+
+          const csvText = await response.text();
+
+          if (!csvText || csvText.trim().length === 0) {
+            throw new Error("CSV vazio ou inválido");
+          }
+
+          const data = parseCSV(csvText);
+
+          if (data.length === 0) {
+            throw new Error("Nenhum dado encontrado no CSV");
+          }
+
+          allData = data;
+          displayData(data);
+        } catch (error) {
+          console.error("Erro detalhado:", error);
+
+          let errorMessage = `
+                    <div class="error">
+                        ❌ Erro ao carregar dados: ${error.message}<br><br>
+                        <strong>Possíveis soluções:</strong><br><br>
+                        
+                        <strong>1. Verifique as permissões da planilha:</strong><br>
+                        • Abra a planilha no Google Sheets<br>
+                        • Clique em "Compartilhar" (canto superior direito)<br>
+                        • Em "Acesso geral", selecione "Qualquer pessoa com o link"<br>
+                        • Permissão: "Visualizador"<br><br>
+                        
+                        <strong>2. Certifique-se de que a planilha está publicada:</strong><br>
+                        • Arquivo → Compartilhar → Publicar na web<br>
+                        • Escolha formato CSV<br>
+                        • Marque "Publicar automaticamente"<br><br>
+                        
+                        <strong>3. Para compartilhar com outras pessoas:</strong><br>
+                        • Hospede este arquivo em um servidor web, ou<br>
+                        • Use um servidor local (veja instruções abaixo)<br><br>
+                        
+                        <strong>Como usar servidor local:</strong><br>
+                        • Abra o terminal/prompt na pasta do arquivo<br>
+                        • Execute: <code>python -m http.server 8000</code><br>
+                        • Acesse: <code>http://localhost:8000</code><br><br>
+                        
+                        <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin-top: 15px;">
+                            <strong>Link do CSV:</strong><br>
+                            <a href="${CSV_URL}" target="_blank">${CSV_URL}</a><br>
+                            <small style="color: #666;">Tente abrir este link em uma nova aba para verificar se funciona</small>
+                        </div>
+                    </div>
+                `;
+
+          contentDiv.innerHTML = errorMessage;
+        }
+      }
+
+      // Carregar dados ao iniciar a página
+      loadData();
+    </script>
+  </body>
+</html>
