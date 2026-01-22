@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fila de Produção - Editável</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+        min-height: 100vh;
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        overflow: hidden;
+      }
+
+      header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 30px;
+        text-align: center;
+      }
+
+      h1 {
+        font-size: 2em;
+        margin-bottom: 10px;
+      }
+
+      .auth-section {
+        padding: 20px;
+        text-align: center;
+        background: #f5f5f5;
+        border-bottom: 2px solid #e0e0e0;
+      }
+
+      .auth-btn {
+        background: #4285f4;
+        color: white;
+        border: none;
+        padding: 12px 28px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1em;
+        font-weight: 500;
+        transition: background 0.3s ease;
+      }
+
+      .auth-btn:hover {
+        background: #357ae8;
+      }
+
+      .auth-status {
+        color: #155724;
+        font-weight: 500;
+        font-size: 1.1em;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 50px;
+        font-size: 1.2em;
+        color: #667eea;
+      }
+
+      .tabs-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 20px 20px 0 20px;
+        border-bottom: 2px solid #e0e0e0;
+      }
+
+      .tab {
+        padding: 12px 24px;
+        background: #f5f5f5;
+        border: none;
+        border-radius: 8px 8px 0 0;
+        cursor: pointer;
+        font-size: 1em;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        color: #666;
+      }
+
+      .tab:hover {
+        background: #e0e0e0;
+      }
+
+      .tab.active {
+        background: #667eea;
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+      }
+
+      .count-badge {
+        background: rgba(255, 255, 255, 0.3);
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.85em;
+        margin-left: 8px;
+      }
+
+      .tab.active .count-badge {
+        background: rgba(255, 255, 255, 0.4);
+      }
+
+      .refresh-btn {
+        background: #667eea;
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1em;
+        margin: 20px;
+        transition: background 0.3s ease;
+      }
+
+      .refresh-btn:hover {
+        background: #5568d3;
+      }
+
+      .table-container {
+        overflow-x: auto;
+        padding: 20px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 800px;
+      }
+
+      thead {
+        background: #667eea;
+        color: white;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+
+      th {
+        padding: 15px;
+        text-align: left;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.9em;
+        letter-spacing: 0.5px;
+      }
+
+      td {
+        padding: 12px 15px;
+        border-bottom: 1px solid #e0e0e0;
+      }
+
+      tbody tr:hover {
+        background-color: #f5f5f5;
+        transition: background-color 0.3s ease;
+      }
+
+      tbody tr:nth-child(even) {
+        background-color: #fafafa;
+      }
+
+      .editable-cell {
+        cursor: pointer;
+        position: relative;
+      }
+
+      .editable-cell:hover {
+        background-color: #e8eaf6 !important;
+      }
+
+      .editable-select,
+      .editable-input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 2px solid #667eea;
+        border-radius: 4px;
+        font-size: 0.95em;
+        font-family: inherit;
+        background: white;
+        outline: none;
+        transition: all 0.2s ease;
+      }
+
+      .editable-select:focus,
+      .editable-input:focus {
+        border-color: #5568d3;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+      }
+
+      .status-badge {
+        display: inline-block;
+        padding: 5px 14px;
+        border-radius: 14px;
+        font-size: 0.85em;
+        font-weight: 500;
+      }
+
+      .status-aguardando {
+        background: #e3f2fd;
+        color: #1565c0;
+      }
+
+      .status-em-separacao {
+        background: #fff3cd;
+        color: #856404;
+      }
+
+      .status-falta-material {
+        background: #f8d7da;
+        color: #721c24;
+      }
+
+      .status-pausada {
+        background: #fff3e0;
+        color: #e65100;
+      }
+
+      .status-finalizada {
+        background: #d4edda;
+        color: #155724;
+      }
+
+      .save-indicator {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 24px;
+        background: #4caf50;
+        color: white;
+        border-radius: 5px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        font-weight: 500;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        z-index: 1000;
+      }
+
+      .save-indicator.show {
+        opacity: 1;
+      }
+
+      .save-indicator.error {
+        background: #f44336;
+      }
+
+      .error {
+        color: #d32f2f;
+        padding: 30px;
+        text-align: center;
+        font-size: 1.1em;
+      }
+
+      .info-box {
+        background: #e3f2fd;
+        border-left: 4px solid #2196f3;
+        padding: 15px;
+        margin: 20px;
+        border-radius: 4px;
+      }
+
+      .info-box h3 {
+        color: #1976d2;
+        margin-bottom: 8px;
+      }
+
+      .info-box p {
+        color: #555;
+        line-height: 1.6;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>📊 Fila de Produção</h1>
+        <p>Sistema de Gerenciamento com Google Sheets</p>
+      </header>
+
+      <div id="authSection" class="auth-section">
+        <p style="margin-bottom: 15px; color: #666;">
+          Para editar os dados, é necessário fazer login com sua conta Google
+        </p>
+        <button id="authorizeButton" class="auth-btn" onclick="handleAuthClick()">
+          🔐 Fazer Login com Google
+        </button>
+        <button id="signoutButton" class="auth-btn" onclick="handleSignoutClick()" style="display: none;">
+          🚪 Sair
+        </button>
+        <p id="authStatus" class="auth-status" style="margin-top: 10px;"></p>
+      </div>
+
+      <div class="info-box" id="infoBox">
+        <h3>⚙️ Configuração Necessária</h3>
+        <p>
+          <strong>IMPORTANTE:</strong> Para que a edição funcione, você precisa configurar a API do Google Sheets.<br>
+          <strong>Passos:</strong><br>
+          1. Acesse <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a><br>
+          2. Crie um novo projeto<br>
+          3. Ative a "Google Sheets API"<br>
+          4. Crie credenciais OAuth 2.0 para aplicação web<br>
+          5. Adicione sua URL autorizada (GitHub Pages URL)<br>
+          6. Copie o Client ID e cole no código (linha 302)
+        </p>
+      </div>
+
+      <div id="tabs" class="tabs-container" style="display: none;">
+        <!-- Abas serão geradas dinamicamente -->
+      </div>
+
+      <button class="refresh-btn" onclick="loadData()" id="refreshBtn" style="display: none;">
+        🔄 Atualizar Dados
+      </button>
+
+      <div id="content">
+        <div class="loading">Faça login para visualizar e editar os dados...</div>
+      </div>
+    </div>
+
+    <div id="saveIndicator" class="save-indicator">💾 Salvando...</div>
+
+    <script>
+      // ==================== CONFIGURAÇÃO ====================
+      // SUBSTITUA ESTE CLIENT_ID pelo seu após configurar o Google Cloud Console
+      const CLIENT_ID = '473777463487-php6vs0stvuppoeg0q34sumbe4jk6517.apps.googleusercontent.com';
+      const API_KEY = 'AIzaSyC5uhZI3_KU9HW38e4lNLQtlfEBYyyczaE';
+      const DISCOVERY_DOC = 'https://sheets.googleapis.com/$discovery/rest?version=v4';
+      const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
+      
+      // ID da sua planilha (extraído do URL)
+      const SPREADSHEET_ID = '12cnMr8XidGirXKOWP0DtxWyyPglw5clj3WtCVgvmTe4';
+      const SHEET_NAME = 'Sheet1'; // Altere se necessário
+
+      // ==================== VARIÁVEIS GLOBAIS ====================
+      let tokenClient;
+      let gapiInited = false;
+      let gisInited = false;
+      let allData = [];
+      let currentFilter = 'TODOS';
+      let isAuthenticated = false;
+
+      // ==================== INICIALIZAÇÃO ====================
+      function gapiLoaded() {
+        console.log('🔄 Carregando GAPI...');
+        gapi.load('client', initializeGapiClient);
+      }
+
+      async function initializeGapiClient() {
+        try {
+          await gapi.client.init({
+            apiKey: API_KEY,
+            discoveryDocs: [DISCOVERY_DOC],
+          });
+          gapiInited = true;
+          console.log('✅ GAPI inicializado');
+          maybeEnableButtons();
+        } catch (error) {
+          console.error('❌ Erro ao inicializar GAPI:', error);
+          document.getElementById('content').innerHTML = 
+            `<div class="error">Erro ao inicializar: ${error.message}</div>`;
+        }
+      }
+
+      function gisLoaded() {
+        console.log('🔄 Carregando GIS...');
+        try {
+          tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: SCOPES,
+            callback: '',
+          });
+          gisInited = true;
+          console.log('✅ GIS inicializado');
+          maybeEnableButtons();
+        } catch (error) {
+          console.error('❌ Erro ao inicializar GIS:', error);
+        }
+      }
+
+      function maybeEnableButtons() {
+        if (gapiInited && gisInited) {
+          console.log('✅ Sistema pronto!');
+          document.getElementById('authorizeButton').style.display = 'inline-block';
+          document.getElementById('content').innerHTML = 
+            '<div class="loading">Faça login para visualizar e editar os dados...</div>';
+        }
+      }
+
+      // ==================== AUTENTICAÇÃO ====================
+      function handleAuthClick() {
+        tokenClient.callback = async (resp) => {
+          if (resp.error !== undefined) {
+            throw (resp);
+          }
+          document.getElementById('signoutButton').style.display = 'inline-block';
+          document.getElementById('authorizeButton').style.display = 'none';
+          document.getElementById('authStatus').textContent = '✅ Autenticado com sucesso!';
+          document.getElementById('infoBox').style.display = 'none';
+          document.getElementById('tabs').style.display = 'flex';
+          document.getElementById('refreshBtn').style.display = 'inline-block';
+          isAuthenticated = true;
+          await loadData();
+        };
+
+        if (gapi.client.getToken() === null) {
+          tokenClient.requestAccessToken({prompt: 'consent'});
+        } else {
+          tokenClient.requestAccessToken({prompt: ''});
+        }
+      }
+
+      function handleSignoutClick() {
+        const token = gapi.client.getToken();
+        if (token !== null) {
+          google.accounts.oauth2.revoke(token.access_token);
+          gapi.client.setToken('');
+          document.getElementById('content').innerHTML = '<div class="loading">Faça login para visualizar os dados...</div>';
+          document.getElementById('authorizeButton').style.display = 'inline-block';
+          document.getElementById('signoutButton').style.display = 'none';
+          document.getElementById('authStatus').textContent = '';
+          document.getElementById('tabs').style.display = 'none';
+          document.getElementById('refreshBtn').style.display = 'none';
+          isAuthenticated = false;
+        }
+      }
+
+      // ==================== CARREGAR DADOS ====================
+      async function loadData() {
+        const contentDiv = document.getElementById('content');
+        const tabsDiv = document.getElementById('tabs');
+        contentDiv.innerHTML = '<div class="loading">Carregando dados...</div>';
+        tabsDiv.innerHTML = '';
+
+        try {
+          const response = await gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${SHEET_NAME}!A:Z`,
+          });
+
+          const rows = response.result.values;
+          if (!rows || rows.length === 0) {
+            contentDiv.innerHTML = '<div class="error">Nenhum dado encontrado.</div>';
+            return;
+          }
+
+          allData = rows;
+          displayData(rows);
+        } catch (err) {
+          contentDiv.innerHTML = `<div class="error">Erro ao carregar dados: ${err.message}</div>`;
+          console.error(err);
+        }
+      }
+
+      // ==================== CRIAR ABAS ====================
+      function createTabs(data) {
+        const tabsDiv = document.getElementById('tabs');
+        const headers = data[0];
+        const rows = data.slice(1);
+
+        const destinoIndex = headers.findIndex(h => h.toLowerCase().includes('destino'));
+
+        if (destinoIndex === -1) {
+          tabsDiv.innerHTML = '';
+          return;
+        }
+
+        const destinos = new Set();
+        rows.forEach(row => {
+          const destino = row[destinoIndex];
+          if (destino && destino.trim()) {
+            destinos.add(destino.trim());
+          }
+        });
+
+        let tabsHTML = '';
+        const destinosSorted = ['TODOS', ...Array.from(destinos).sort()];
+
+        destinosSorted.forEach(destino => {
+          const count = destino === 'TODOS' ? rows.length :
+            rows.filter(row => row[destinoIndex] && row[destinoIndex].trim() === destino).length;
+          const activeClass = destino === currentFilter ? 'active' : '';
+          tabsHTML += `<button class="tab ${activeClass}" onclick="filterByDestino('${destino}')">
+            ${destino} <span class="count-badge">${count}</span>
+          </button>`;
+        });
+
+        tabsDiv.innerHTML = tabsHTML;
+      }
+
+      function filterByDestino(destino) {
+        currentFilter = destino;
+        displayData(allData);
+      }
+
+      // ==================== EXIBIR DADOS ====================
+      function displayData(data) {
+        const contentDiv = document.getElementById('content');
+
+        if (data.length === 0) {
+          contentDiv.innerHTML = '<div class="error">Nenhum dado encontrado.</div>';
+          return;
+        }
+
+        const headers = data[0];
+        let rows = data.slice(1);
+
+        // Encontrar índices das colunas importantes
+        const statusIndex = headers.findIndex(h => h.toLowerCase().includes('status'));
+        const separadorIndex = headers.findIndex(h => h.toLowerCase().includes('separador'));
+        const dataAtualizacaoIndex = headers.findIndex(h => 
+          h.toLowerCase().includes('data') && h.toLowerCase().includes('atualiza'));
+        const destinoIndex = headers.findIndex(h => h.toLowerCase().includes('destino'));
+        const comentarioIndex = headers.findIndex(h => h.toLowerCase().includes('coment'));
+
+        // Filtrar por destino
+        if (currentFilter !== 'TODOS' && destinoIndex !== -1) {
+          rows = rows.filter(row => row[destinoIndex] && row[destinoIndex].trim() === currentFilter);
+        }
+
+        createTabs(data);
+
+        let html = '<div class="table-container"><table>';
+
+        // Cabeçalho
+        html += '<thead><tr>';
+        headers.forEach(header => {
+          html += `<th>${header}</th>`;
+        });
+        html += '</tr></thead>';
+
+        // Corpo da tabela
+        html += '<tbody>';
+        if (rows.length === 0) {
+          html += `<tr><td colspan="${headers.length}" style="text-align: center; padding: 30px; color: #999;">
+            Nenhum dado encontrado para ${currentFilter}</td></tr>`;
+        } else {
+          rows.forEach((row, rowIndex) => {
+            // Calcular o índice real da linha na planilha (+2 porque: +1 para header, +1 porque é 1-indexed)
+            const actualRowIndex = data.slice(1).indexOf(row) + 2;
+            
+            html += '<tr>';
+            headers.forEach((header, colIndex) => {
+              const cellValue = row[colIndex] || '';
+              let cellHTML = '';
+
+              // Status - Dropdown editável
+              if (colIndex === statusIndex) {
+                const statusClass = cellValue.toLowerCase().replace(/\s+/g, '-');
+                cellHTML = `<td class="editable-cell" onclick="editStatus(${actualRowIndex}, ${colIndex}, this)">
+                  <span class="status-badge status-${statusClass}">${cellValue || 'Aguardando'}</span>
+                </td>`;
+              }
+              // Separador - Input editável
+              else if (colIndex === separadorIndex) {
+                cellHTML = `<td class="editable-cell" onclick="editSeparador(${actualRowIndex}, ${colIndex}, this)">
+                  ${cellValue}
+                </td>`;
+              }
+              // Data Atualização - Apenas exibição
+              else if (colIndex === dataAtualizacaoIndex) {
+                cellHTML = `<td style="color: #666; font-size: 0.9em;">${cellValue}</td>`;
+              }
+              // Comentário - Input editável com atualização de data
+              else if (colIndex === comentarioIndex) {
+                cellHTML = `<td class="editable-cell" onclick="editComentario(${actualRowIndex}, ${colIndex}, this)">
+                  ${cellValue}
+                </td>`;
+              }
+              // Outras colunas - apenas exibição
+              else {
+                cellHTML = `<td>${cellValue}</td>`;
+              }
+
+              html += cellHTML;
+            });
+            html += '</tr>';
+          });
+        }
+        html += '</tbody></table></div>';
+
+        contentDiv.innerHTML = html;
+      }
+
+      // ==================== EDIÇÃO - STATUS ====================
+      async function editStatus(row, col, cell) {
+        if (!isAuthenticated) {
+          showSaveIndicator('Faça login para editar', true);
+          return;
+        }
+
+        const currentValue = cell.querySelector('.status-badge')?.textContent.trim() || 'Aguardando';
+        const options = ['Aguardando', 'Em Separação', 'Falta Material', 'Pausada', 'Finalizada'];
+
+        const select = document.createElement('select');
+        select.className = 'editable-select';
+        options.forEach(option => {
+          const opt = document.createElement('option');
+          opt.value = option;
+          opt.textContent = option;
+          if (option === currentValue) opt.selected = true;
+          select.appendChild(opt);
+        });
+
+        cell.innerHTML = '';
+        cell.appendChild(select);
+        select.focus();
+
+        select.onchange = async () => {
+          const newValue = select.value;
+          console.log('Status alterado para:', newValue);
+          // Por enquanto não salva - apenas mostra no console
+          const statusClass = newValue.toLowerCase().replace(/\s+/g, '-');
+          cell.innerHTML = `<span class="status-badge status-${statusClass}">${newValue}</span>`;
+        };
+
+        select.onblur = () => {
+          setTimeout(() => {
+            if (!select.value || select.value === currentValue) {
+              const statusClass = currentValue.toLowerCase().replace(/\s+/g, '-');
+              cell.innerHTML = `<span class="status-badge status-${statusClass}">${currentValue}</span>`;
+            }
+          }, 100);
+        };
+      }
+
+      // ==================== EDIÇÃO - SEPARADOR ====================
+      async function editSeparador(row, col, cell) {
+        if (!isAuthenticated) {
+          showSaveIndicator('Faça login para editar', true);
+          return;
+        }
+
+        const currentValue = cell.textContent.trim();
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'editable-input';
+        input.value = currentValue;
+
+        cell.innerHTML = '';
+        cell.appendChild(input);
+        input.focus();
+        input.select();
+
+        input.onblur = async () => {
+          const newValue = input.value.trim();
+          if (newValue !== currentValue) {
+            await updateCell(row, col, newValue);
+          }
+          setTimeout(() => loadData(), 100);
+        };
+
+        input.onkeypress = async (e) => {
+          if (e.key === 'Enter') {
+            input.blur();
+          }
+        };
+      }
+
+      // ==================== EDIÇÃO - COMENTÁRIO ====================
+      async function editComentario(row, col, cell) {
+        if (!isAuthenticated) {
+          showSaveIndicator('Faça login para editar', true);
+          return;
+        }
+
+        const currentValue = cell.textContent.trim();
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'editable-input';
+        input.value = currentValue;
+
+        cell.innerHTML = '';
+        cell.appendChild(input);
+        input.focus();
+        input.select();
+
+        input.onblur = async () => {
+          const newValue = input.value.trim();
+          if (newValue !== currentValue) {
+            await updateCell(row, col, newValue);
+            await updateDataAtualização(row);
+          }
+          setTimeout(() => loadData(), 100);
+        };
+
+        input.onkeypress = async (e) => {
+          if (e.key === 'Enter') {
+            input.blur();
+          }
+        };
+      }
+
+      // ==================== ATUALIZAR CÉLULA ====================
+      async function updateCell(row, col, value) {
+        try {
+          showSaveIndicator('Salvando...', false);
+
+          const columnLetter = String.fromCharCode(65 + col); // A=65, B=66, etc.
+          const range = `${SHEET_NAME}!${columnLetter}${row}`;
+
+          await gapi.client.sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: range,
+            valueInputOption: 'USER_ENTERED',
+            resource: {
+              values: [[value]]
+            }
+          });
+
+          showSaveIndicator('✅ Salvo!', false);
+        } catch (err) {
+          console.error('Erro ao salvar:', err);
+          showSaveIndicator('❌ Erro ao salvar', true);
+        }
+      }
+
+      // ==================== ATUALIZAR DATA ====================
+      async function updateDataAtualização(row) {
+        const headers = allData[0];
+        const dataIndex = headers.findIndex(h => 
+          h.toLowerCase().includes('data') && h.toLowerCase().includes('atualiza'));
+
+        if (dataIndex === -1) return;
+
+        const now = new Date();
+        const dataHora = now.toLocaleString('pt-BR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+
+        const columnLetter = String.fromCharCode(65 + dataIndex);
+        const range = `${SHEET_NAME}!${columnLetter}${row}`;
+
+        try {
+          await gapi.client.sheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: range,
+            valueInputOption: 'USER_ENTERED',
+            resource: {
+              values: [[dataHora]]
+            }
+          });
+        } catch (err) {
+          console.error('Erro ao atualizar data:', err);
+        }
+      }
+
+      // ==================== INDICADOR DE SALVAMENTO ====================
+      function showSaveIndicator(message, isError) {
+        const indicator = document.getElementById('saveIndicator');
+        indicator.textContent = message;
+        indicator.classList.toggle('error', isError);
+        indicator.classList.add('show');
+
+        setTimeout(() => {
+          indicator.classList.remove('show');
+        }, 2000);
+      }
+
+      // ==================== CARREGAR SCRIPTS DO GOOGLE ====================
+      const script1 = document.createElement('script');
+      script1.src = 'https://apis.google.com/js/api.js';
+      script1.onload = gapiLoaded;
+      document.head.appendChild(script1);
+
+      const script2 = document.createElement('script');
+      script2.src = 'https://accounts.google.com/gsi/client';
+      script2.onload = gisLoaded;
+      document.head.appendChild(script2);
+    </style>
+  </body>
+</html>
