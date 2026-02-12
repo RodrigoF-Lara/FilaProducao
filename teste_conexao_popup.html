@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Teste de Conexão Supabase</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f0f2f5; }
+        button { font-size: 1.2rem; padding: 15px 30px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <button id="test-btn">Testar Conexão com Supabase</button>
+
+    <script>
+        document.getElementById('test-btn').addEventListener('click', async () => {
+            const button = document.getElementById('test-btn');
+            button.disabled = true;
+            button.textContent = 'Testando...';
+
+            try {
+                const response = await fetch('testar_supabase.php');
+                const result = await response.json();
+
+                // Formata o resultado para exibição no alerta
+                let alertMessage = `Conexão: ${result.conexao}\n`;
+                alertMessage += `Mensagem: ${result.mensagem}\n\n`;
+                
+                if (result.conexao && result.usuarios) {
+                    alertMessage += `Usuários encontrados (${result.usuarios.length}):\n`;
+                    alertMessage += JSON.stringify(result.usuarios, null, 2); // Exibe os usuários formatados
+                } else if (result.usuarios && result.usuarios.erro) {
+                    alertMessage += `Erro ao buscar usuários: ${result.usuarios.erro}\n`;
+                }
+                
+                alert(alertMessage);
+
+            } catch (error) {
+                alert('Falha crítica ao executar o teste. O servidor pode estar offline ou o arquivo PHP não foi encontrado.\n\nErro: ' + error.message);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Testar Conexão com Supabase';
+            }
+        });
+    </script>
+</body>
+</html>

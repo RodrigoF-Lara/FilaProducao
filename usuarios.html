@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Usuarios - Cofelma</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Manutencao de Usuarios</h1>
+      <a href="index.html" class="back-btn">Voltar</a>
+    </div>
+
+    <div class="form-container">
+      <h2 id="form-title">Novo / Editar Usuario</h2>
+      <form id="user-form">
+        <!-- Campo oculto para armazenar o ID do usuário durante a edição -->
+        <input type="hidden" id="user-id" name="id">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="usuario">Usuário</label>
+            <input type="text" id="usuario" name="usuario" required>
+          </div>
+          <div class="form-group">
+            <label for="senha">Senha</label>
+            <input type="password" id="senha" name="senha" placeholder="Deixe em branco para não alterar">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="codigo_focco">Código Focco</label>
+            <input type="text" id="codigo_focco" name="codigo_focco" required>
+          </div>
+          <div class="form-group">
+            <label for="nome_completo">Nome completo</label>
+            <input type="text" id="nome_completo" name="nome_completo">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="email">E-mail</label>
+            <input type="email" id="email" name="email" placeholder="E-mail do usuário">
+          </div>
+          <div class="form-group">
+            <label for="ativo">Ativo</label>
+            <select id="ativo" name="ativo">
+              <option value="true" selected>Sim</option>
+              <option value="false">Não</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="nivel">Nível</label>
+            <select id="nivel" name="nivel">
+              <option value="administrador">Administrador</option>
+              <option value="gestor">Gestor</option>
+              <option value="pcp">PCP</option>
+              <option value="lider">Líder</option>
+              <option value="operador" selected>Operador</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <!-- Espaço vazio para manter o alinhamento de duas colunas -->
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" id="salvar-btn">Salvar</button>
+          <button type="button" id="cancelar-btn">Cancelar</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="users-card">
+      <h3>Usuarios cadastrados</h3>
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Usuario</th>
+            <th>Codigo Focco</th>
+            <th>Nome</th>
+            <th>E-mail</th>
+            <th>Nível</th>
+            <th>Ativo</th>
+            <th>Acoes</th>
+          </tr>
+        </thead>
+        <tbody id="lista-usuarios">
+          <!-- Linhas de usuários serão inseridas aqui -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="usuarios.js"></script>
+</body>
+
+</html>

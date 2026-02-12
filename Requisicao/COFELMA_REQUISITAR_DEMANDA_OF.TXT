@@ -1,0 +1,25 @@
+Requisição de Itens Planejada
+
+DECLARE
+ v_erro VARCHAR2(4000);
+BEGIN
+ COFELMA_REQUISITAR_DEMANDA_OF( pi_cod_emp => 1 -- Código da empresa
+ , pi_num_ordem => 11111 -- Número da OF
+ , pi_cod_item => 'ABC' -- Código do item da demanda
+ , pi_qtde => 3 -- Quantidade a ser requisitada
+ , pi_cod_func => '123' -- Código do funcionário
+ , pi_tmasc_item_id => NULL -- ID do configurado (opcional)
+ , pi_seq_demanda => NULL -- Sequência da demanda na ordem (opcional)
+ , po_erro => v_erro ); -- Retorno da procedure (NULL = sucesso)
+ DBMS_OUTPUT.PUT_LINE(v_erro);
+END;
+Objetivo do procedimento: realizar a requisição das demandas das ordens de fabricação.
+Processo semelhante ao executado pelo programa FEST0111 no FoccoERP.
+• Empresa, ordem, item, quantidade e funcionário são parâmetros obrigatórios.
+• O ID da máscara (pi_tmasc_item_id) só é obrigatório quando a demanda é de um item configurado.
+• A sequência da demanda (pi_seq_demanda) só é obrigatória quando numa mesma ordem existem itens repetidos nas demandas.
+• O parâmetro “po_erro” é o único parâmetro de saída. Caso aconteça algum erro no processo a mensagem será retornada neste
+parâmetro. Se ele retornar nulo é porque o processo foi executado com sucesso.
+IMPORTANTE:Criei a procedure no schema FOCCO3I e posteriormente dei os grants necessários para que o usuário FOCCO_CONSULTA
+possa executar a mesma. Criei também um sinônimo para que não seja necessário adicionar o schema FOCCO3I na chamada do
+procedimento.
