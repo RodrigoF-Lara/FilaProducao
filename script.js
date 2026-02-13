@@ -886,7 +886,6 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     async function enriquecerDadosSeparacao() {
         try {
-            console.log('[DEBUG enriquecerDadosSeparacao] INÍCIO');
             // Buscar mapa de usuários
             const resUsuarios = await fetch('usuarios_api.php');
             const RUsuarios = await resUsuarios.json();
@@ -899,14 +898,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const ordensEmSeparacao = dadosSetores[setor]['separacao'].dados;
                 if (ordensEmSeparacao.length === 0) continue;
 
-                console.log(`[DEBUG enriquecerDadosSeparacao] Setor: ${setor}`);
-                console.table(ordensEmSeparacao.map(o => ({
-                    numero_ordem: o.numero_ordem || o.ordem,
-                    sequencia: o.sequencia,
-                    operacao: o.operacao,
-                    objeto: o
-                })));
-
                 // Garante que os campos estejam corretos
                 const promises = ordensEmSeparacao.map(ordem => {
                     const numero_ordem = ordem.numero_ordem || ordem.ordem;
@@ -915,7 +906,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         numero_ordem: numero_ordem,
                         sequencia: sequencia
                     });
-                    console.log('[DEBUG enriquecerDadosSeparacao] Fetch separacao_api.php', { numero_ordem, sequencia });
                     return fetch(`separacao_api.php?${params.toString()}`)
                         .then(res => res.json())
                         .catch(e => ({ success: false, error: e }));
@@ -927,9 +917,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const numero_ordem = ordem.numero_ordem || ordem.ordem;
                     const sequencia = ordem.sequencia;
                     const historicoResult = resultadosHistoricos[index];
-                    console.log('[DEBUG enriquecerDadosSeparacao] Resposta separacao_api.php', { numero_ordem, sequencia, historicoResult });
                     if (!historicoResult.success || !historicoResult.data || historicoResult.data.length === 0) {
-                        console.warn('[DEBUG enriquecerDadosSeparacao] Sem histórico para ordem', { numero_ordem, sequencia, ordem });
                         return;
                     }
 
@@ -937,7 +925,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const ultimoEvento = historico[0];
 
                     if (ultimoEvento.acao === 'FIM') {
-                        console.log('[DEBUG enriquecerDadosSeparacao] Ordem já finalizada', { numero_ordem, sequencia, ordem });
                         return;
                     }
 
@@ -954,12 +941,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         dataInicio: eventoDeInicio ? new Date(eventoDeInicio.data_acao).toLocaleString('pt-BR') : 'N/A',
                         debugHistorico: historico
                     };
-                    console.log('[DEBUG enriquecerDadosSeparacao] separacaoInfo atribuída', { numero_ordem, sequencia, separacaoInfo: ordem.separacaoInfo });
                 });
             }
-            console.log('[DEBUG enriquecerDadosSeparacao] FIM');
         } catch (error) {
-            console.error('[DEBUG enriquecerDadosSeparacao] ERRO:', error);
+            // Erro silencioso
         }
     }
     
@@ -987,10 +972,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function atualizarDados(setor) {
-        console.log('[LOG atualizarDados] Início', { setor });
+        // ...log removido...
         const dados = dadosSetores[setor];
         if (!dados) {
-            console.warn('[LOG atualizarDados] Setor não encontrado', { setor });
+            // ...log removido...
             return;
         }
 
@@ -1004,7 +989,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const renderTabela = (tipo, tbodySelector) => {
             const tbody = document.querySelector(tbodySelector);
             if (!tbody) {
-                console.warn('[LOG atualizarDados] tbody não encontrado', { tipo, tbodySelector });
+                // ...log removido...
                 return;
             }
             const dadosDoTipo = dados[tipo].dados;
@@ -1197,7 +1182,7 @@ window.requisitarDemandas = async function(numero_ordem, sequencia) {
         renderTabela('producao', '#tab-producao tbody');
         renderTabela('separacao', '#tab-separacao tbody');
         renderTabela('componentes', '#tab-componentes tbody');
-        console.log('[LOG atualizarDados] Fim', { setor });
+        // ...log removido...
     }
 
     /**
