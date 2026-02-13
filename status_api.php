@@ -22,7 +22,7 @@ try {
         elseif (!empty($setor)) {
             // Usa a view 'latest_status_by_order' que já faz o trabalho de pegar o último status
             // A view precisa ser ajustada no Supabase para incluir os campos adicionais
-            $select_fields = 'numero_ordem,sequencia,operacao,setor,status_novo,data_finalizacao,cliente,cod_item,qtde,dt_entrega';
+            $select_fields = 'numero_ordem,sequencia,operacao,setor,status_novo,data_finalizacao,cliente,cod_item,qtde,dt_entrega,posicao_fila';
             if ($setorLower === 'all') {
                 $query = "select={$select_fields}";
                 $response['data'] = $supabase->select('latest_status_by_order', $query);

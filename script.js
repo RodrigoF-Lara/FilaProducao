@@ -1010,9 +1010,30 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
+                // Usa posicao_fila (timestampz) para a data, formatando para pt-BR
+                let dataFila = '';
+                if (item.posicao_fila) {
+                    console.log('[DATA DEBUG] posicao_fila bruto:', item.posicao_fila, 'tipo:', typeof item.posicao_fila);
+                    try {
+                        const dt = new Date(item.posicao_fila);
+                        console.log('[DATA DEBUG] Date construído:', dt, 'timestamp:', dt.getTime());
+                        if (!isNaN(dt.getTime())) {
+                            dataFila = dt.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+                            console.log('[DATA DEBUG] dataFila formatado:', dataFila);
+                        } else {
+                            dataFila = item.posicao_fila;
+                            console.warn('[DATA DEBUG] Date inválido, usando valor bruto:', dataFila);
+                        }
+                    } catch (e) {
+                        dataFila = item.posicao_fila;
+                        console.error('[DATA DEBUG] Erro ao converter data:', e, 'usando valor bruto:', dataFila);
+                    }
+                } else {
+                    console.warn('[DATA DEBUG] posicao_fila não existe para item:', item);
+                }
                 return `
                     <tr class="${rowClass}" data-ordem="${item.numero_ordem}" data-sequencia="${item.sequencia}" data-operacao="${item.operacao}">
-                        <td>${item.dt_entrega}${infoExtraHtml}</td>
+                        <td>${dataFila}${infoExtraHtml}</td>
                         <td>${item.numero_ordem}</td>
                         <td>${item.sequencia}</td>
                         <td>${item.operacao}</td>
@@ -1068,11 +1089,55 @@ window.abrirDemandas = async function(numero_ordem, sequencia) {
             demandasPorSeq[seq].demandas.push(demanda);
         });
         let html = '';
-        // Campo para código focco do requisitante
-        html += `<div style="margin-bottom:18px;display:flex;align-items:center;gap:16px;">
-            <label for="codigo-focco-requisitante" style="font-weight:bold;">Código Focco do requisitante:</label>
-            <input id="codigo-focco-requisitante" type="text" style="padding:6px 12px;font-size:1em;border-radius:6px;border:1px solid #ccc;width:180px;" placeholder="(opcional)" />
-            <span style="color:#888;font-size:0.95em;">Se vazio, será usado o código do usuário logado.</span>
+        // Extrair código do produto, descrição, data e cliente da primeira demanda (se houver)
+        let cod_produto = '', descricao = '', data = '', cliente = '', quantidade = '';
+        const primeiraDemanda = result.data && result.data.length > 0 ? result.data[0] : null;
+        if (primeiraDemanda) {
+            cod_produto = primeiraDemanda.COD_ITEM || primeiraDemanda.cod_item || '';
+            descricao = primeiraDemanda.DESC_TECNICA || primeiraDemanda.desc_tecnica || '';
+        }
+        // Buscar data e cliente da ordem correspondente em dadosSetores
+        const ordemInfo = (() => {
+            for (const setor of Object.values(dadosSetores)) {
+                for (const tipo of ['producao', 'separacao', 'componentes']) {
+                    const ordem = setor[tipo].dados.find(o => String(o.ordem) === String(numero_ordem) || String(o.numero_ordem) === String(numero_ordem));
+                    if (ordem) return ordem;
+                }
+            }
+            return null;
+        })();
+        if (ordemInfo) {
+            console.log('[IMPRESSAO] ordemInfo:', ordemInfo);
+            // Usa posicao_fila (timestampz) para a data
+            if (ordemInfo.posicao_fila) {
+                try {
+                    const dt = new Date(ordemInfo.posicao_fila);
+                    if (!isNaN(dt.getTime())) {
+                        data = dt.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+                    } else {
+                        data = ordemInfo.posicao_fila;
+                    }
+                } catch (e) {
+                    data = ordemInfo.posicao_fila;
+                }
+            } else {
+                data = ordemInfo.data || ordemInfo.dt_entrega || '';
+            }
+            cliente = ordemInfo.cliente || '';
+            quantidade = ordemInfo.qnt || ordemInfo.qtde || ordemInfo.Qnt || ordemInfo.QTDE || ordemInfo.quantidade || '';
+            console.log('[IMPRESSAO] quantidade:', quantidade);
+        } else {
+            console.log('[IMPRESSAO] ordemInfo não encontrada para ordem', numero_ordem);
+        }
+        if (typeof quantidade === 'undefined') quantidade = '';
+        // Botão de imprimir e campo para código focco do requisitante
+        html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:16px;">
+            <button class="modal-action-btn" onclick="window.imprimirDemandasModal('${numero_ordem}', document.getElementById('modal-body').innerHTML, '${cod_produto}', '${descricao}', '${data}', '${cliente}', '${quantidade}')">🖨️ Imprimir</button>
+            <div style="display:flex;align-items:center;gap:16px;">
+                <label for="codigo-focco-requisitante" style="font-weight:bold;">Código Focco do requisitante:</label>
+                <input id="codigo-focco-requisitante" type="text" style="padding:6px 12px;font-size:1em;border-radius:6px;border:1px solid #ccc;width:180px;" placeholder="(opcional)" />
+                <span style="color:#888;font-size:0.95em;">Se vazio, será usado o código do usuário logado.</span>
+            </div>
         </div>`;
         // Buscar endereços de todos os itens de demanda
         for (const seq of Object.keys(demandasPorSeq).sort((a,b)=>parseInt(a)-parseInt(b))) {
