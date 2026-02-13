@@ -1030,6 +1030,29 @@ document.addEventListener('DOMContentLoaded', () => {
 // ========== MODAL DE DEMANDAS ==========
 window.abrirDemandas = async function(numero_ordem, sequencia) {
     abrirModal('Demandas da Ordem', '<div style="padding:20px;text-align:center;">Carregando demandas...</div>');
+    // Função para buscar endereço do Supabase
+    async function buscarEnderecoSupabase(codigo_item) {
+        const SUPABASE_URL = "https://ysvqatplclssljhicfkw.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlzdnFhdHBsY2xzc2xqaGljZmt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MDM3OTEsImV4cCI6MjA4NTk3OTc5MX0.EMBnO1YB2iJbbtK3RSGiTu-o9njryiJ4SYeYikVg6f8";
+        try {
+            const response = await fetch(`${SUPABASE_URL}/rest/v1/estoque?codigo_item=eq.${encodeURIComponent(codigo_item)}`, {
+                headers: {
+                    apikey: SUPABASE_KEY,
+                    Authorization: `Bearer ${SUPABASE_KEY}`,
+                    "Content-Type": "application/json"
+                }
+            });
+            const data = await response.json();
+            if (data.length > 0) {
+                const { estante, prateleira, posicao } = data[0];
+                return `Estante: <b>${estante}</b><br>Prateleira: <b>${prateleira}</b><br>Posição: <b>${posicao}</b>`;
+            } else {
+                return '<span style="color:#888">Endereço não cadastrado</span>';
+            }
+        } catch (e) {
+            return '<span style="color:#e74c3c">Erro ao buscar endereço</span>';
+        }
+    }
     try {
         const response = await fetch(`Requisicao/buscar_demandas.php?num_ordem=${numero_ordem}&cod_emp=1`);
         const result = await response.json();
@@ -1051,7 +1074,8 @@ window.abrirDemandas = async function(numero_ordem, sequencia) {
             <input id="codigo-focco-requisitante" type="text" style="padding:6px 12px;font-size:1em;border-radius:6px;border:1px solid #ccc;width:180px;" placeholder="(opcional)" />
             <span style="color:#888;font-size:0.95em;">Se vazio, será usado o código do usuário logado.</span>
         </div>`;
-        Object.keys(demandasPorSeq).sort((a,b)=>parseInt(a)-parseInt(b)).forEach(seq => {
+        // Buscar endereços de todos os itens de demanda
+        for (const seq of Object.keys(demandasPorSeq).sort((a,b)=>parseInt(a)-parseInt(b))) {
             const grupo = demandasPorSeq[seq];
             html += `
                 <div style="margin:18px 0 6px 0;display:flex;align-items:center;gap:16px;">
@@ -1069,14 +1093,18 @@ window.abrirDemandas = async function(numero_ordem, sequencia) {
                             <th style="padding:8px 12px;min-width:90px;">Pendente</th>
                             <th style="padding:8px 12px;min-width:90px;">Estoque</th>
                             <th style="padding:8px 12px;min-width:110px;">Status</th>
+                            <th style="padding:8px 12px;min-width:110px;">Endereço</th>
                             <th style="padding:8px 12px;min-width:110px;">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
             `;
-            grupo.demandas.forEach(demanda => {
+            // Buscar endereços de todos os itens desta sequência
+            for (const demanda of grupo.demandas) {
                 const pendente = parseFloat(demanda.QTDE_PENDENTE || 0);
                 const status = pendente > 0 ? '<span style="color:#e74c3c;font-weight:bold;">Não Requisitada</span>' : '<span style="color:#27ae60;">OK</span>';
+                // Busca endereço do componente
+                const enderecoHtml = await buscarEnderecoSupabase((demanda.COD_ITEM || '').trim());
                 html += `
                     <tr style="${pendente > 0 ? 'background:#fff3cd;' : ''}">
                         <td style="padding:8px 12px;">${demanda.COD_ITEM}</td>
@@ -1086,14 +1114,15 @@ window.abrirDemandas = async function(numero_ordem, sequencia) {
                         <td style="padding:8px 12px;">${pendente}</td>
                         <td style="padding:8px 12px;">${typeof demanda.SALDO_ATUAL !== 'undefined' && demanda.SALDO_ATUAL !== null ? demanda.SALDO_ATUAL : 0}</td>
                         <td style="padding:8px 12px;">${status}</td>
+                        <td style="padding:8px 12px;">${enderecoHtml}</td>
                         <td style="padding:8px 12px;">
                             <button class="modal-action-btn" style="padding:4px 10px;font-size:0.9em;" onclick="window.requisitarDemandaLinha('${numero_ordem}', '${seq}', '${demanda.COD_ITEM}', '${demanda.QTDE_PENDENTE}', '${demanda.SEQ_DEMANDA}')" ${pendente === 0 ? 'disabled' : ''}>Requisitar</button>
                         </td>
                     </tr>
                 `;
-            });
+            }
             html += `</tbody></table></div>`;
-        });
+        }
         // Requisitar demanda linha a linha
         window.requisitarDemandaLinha = async function(numero_ordem, seq, cod_item, qtde_pendente, seq_demanda) {
             if (parseFloat(qtde_pendente) === 0) {
