@@ -1,8 +1,10 @@
 <?php
-// ========== VERIFICAÇÃO DE AUTENTICAÇÃO ==========
+
+// ========== VERIFICAÇÃO DE AUTENTICAÇÃO ========== 
 session_start();
 $codigoFoccoUsuario = $_POST['codigo_focco'] ?? $_GET['codigo_focco'] ?? null;
 if (!$codigoFoccoUsuario) {
+    header('Content-Type: application/json');
     echo json_encode(['success' => false, 'message' => 'Código Focco não fornecido. Não autenticado.']);
     exit;
 }
@@ -15,6 +17,8 @@ $mensagem = '';
 $tipo_mensagem = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Log de debug para POST recebido
+    file_put_contents(__DIR__ . '/log_requisicao.txt', "POST recebido: " . print_r($_POST, true) . "\n", FILE_APPEND);
     $cod_emp = intval($_POST['cod_emp'] ?? 0);
     $num_ordem = intval($_POST['num_ordem'] ?? 0);
     $cod_item = trim($_POST['cod_item'] ?? '');
@@ -35,10 +39,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!empty($erros)) {
         $mensagem = "Erros de validação:<br>• " . implode("<br>• ", $erros);
         $tipo_mensagem = "error";
+        file_put_contents(__DIR__ . '/log_requisicao.txt', "Validação falhou: $mensagem\n", FILE_APPEND);
     } else {
         $oracle = getOracleConnection();
         if ($oracle->connect()) {
-            $resultado = $oracle->executeProcedure($cod_emp, $num_ordem, $cod_item, $qtde, $cod_func, $tmasc_item_id, $seq_demanda);
+            // seq_demanda removido
+            $resultado = $oracle->executeProcedure($cod_emp, $num_ordem, trim(strtoupper($cod_item)), $qtde, $cod_func, $tmasc_item_id);
             if ($resultado['success']) {
                 $mensagem = "Requisição para o item '{$cod_item}' executada com sucesso!";
                 $tipo_mensagem = "success";
@@ -47,17 +53,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $tipo_mensagem = "error";
             }
             $oracle->close();
+            file_put_contents(__DIR__ . '/log_requisicao.txt', "Resultado procedure: " . print_r($resultado, true) . "\n", FILE_APPEND);
         } else {
             $mensagem = "Erro de conexão: " . $oracle->getError();
             $tipo_mensagem = "error";
+            file_put_contents(__DIR__ . '/log_requisicao.txt', "Erro de conexão: $mensagem\n", FILE_APPEND);
         }
     }
-    
-    if ($is_ajax) {
-        header('Content-Type: application/json');
-        echo json_encode(['success' => ($tipo_mensagem === 'success'), 'message' => strip_tags($mensagem)]);
-        exit;
-    }
+    // Sempre retorna JSON
+    header('Content-Type: application/json');
+    echo json_encode(['success' => ($tipo_mensagem === 'success'), 'message' => strip_tags($mensagem)]);
+    exit;
 }
 ?>
 <!DOCTYPE html>

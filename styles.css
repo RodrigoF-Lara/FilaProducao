@@ -542,8 +542,8 @@ body {
     margin: auto;
     padding: 20px;
     border: 1px solid #888;
-    width: 90%;
-    max-width: 760px;
+    width: 98vw;
+    max-width: 1300px;
     max-height: 85vh;
     overflow-y: auto;
     border-radius: 10px;

@@ -1052,58 +1052,107 @@ window.abrirDemandas = async function(numero_ordem, sequencia) {
             abrirModal('Demandas da Ordem', `<div style="color:red;padding:20px;">Erro ao buscar demandas: ${result.error || 'Erro desconhecido'}</div>`);
             return;
         }
-        // Agrupa demandas por SEQ_DEMANDA (sequência de operação)
+        // Agrupar por sequência de operação
         const demandasPorSeq = {};
         result.data.forEach(demanda => {
-            const seq = demanda.SEQ_DEMANDA || 'Sem Seq';
-            if (!demandasPorSeq[seq]) demandasPorSeq[seq] = [];
-            demandasPorSeq[seq].push(demanda);
+            const seq = demanda.SEQ_DEMANDA || demanda.SEQ_OPERACAO || demanda.seq_operacao || 'Sem Seq';
+            if (!demandasPorSeq[seq]) demandasPorSeq[seq] = { demandas: [], desc_operacao: demanda.DESC_OPERACAO || demanda.desc_operacao || '' };
+            demandasPorSeq[seq].demandas.push(demanda);
         });
         let html = '';
+        // Campo para código focco do requisitante
+        html += `<div style="margin-bottom:18px;display:flex;align-items:center;gap:16px;">
+            <label for="codigo-focco-requisitante" style="font-weight:bold;">Código Focco do requisitante:</label>
+            <input id="codigo-focco-requisitante" type="text" style="padding:6px 12px;font-size:1em;border-radius:6px;border:1px solid #ccc;width:180px;" placeholder="(opcional)" />
+            <span style="color:#888;font-size:0.95em;">Se vazio, será usado o código do usuário logado.</span>
+        </div>`;
         Object.keys(demandasPorSeq).sort((a,b)=>parseInt(a)-parseInt(b)).forEach(seq => {
-            const demandas = demandasPorSeq[seq];
-            let temNaoRequisitada = false;
+            const grupo = demandasPorSeq[seq];
             html += `
                 <div style="margin:18px 0 6px 0;display:flex;align-items:center;gap:16px;">
-                    <span style="font-weight:bold;font-size:1.1em;">Sequência de Operação: ${seq}</span>
-                    <button class="modal-action-btn" style="padding:6px 14px;font-size:0.95em;" onclick="requisitarDemandas(${numero_ordem}, ${seq})">Requisitar Demandas desta Sequência</button>
+                    <span style="font-weight:bold;font-size:1.1em;">Sequência de Operação: ${seq} - ${grupo.desc_operacao}</span>
+                    <button class="modal-action-btn" style="padding:6px 14px;font-size:0.95em;" onclick="window.requisitarDemandas(${numero_ordem}, ${seq})">Requisitar todas demandas desta sequência</button>
                 </div>
                 <div style="overflow-x:auto;">
-                <table class="dados-table demandas-table" style="width:100%;margin-bottom:10px;border-spacing:0 6px;">
+                <table class="dados-table demandas-table" style="width:98vw;max-width:1200px;margin-bottom:10px;border-spacing:0 6px;">
                     <thead>
                         <tr>
-                            <th style="padding:8px 18px;">Item</th>
-                            <th style="padding:8px 18px;">Descrição</th>
-                            <th style="padding:8px 18px;">Necessário</th>
-                            <th style="padding:8px 18px;">Requisitado</th>
-                            <th style="padding:8px 18px;">Pendente</th>
-                            <th style="padding:8px 18px;">Estoque</th>
-                            <th style="padding:8px 18px;">Status</th>
+                            <th style="padding:8px 12px;min-width:120px;">Item</th>
+                            <th style="padding:8px 12px;min-width:220px;">Descrição</th>
+                            <th style="padding:8px 12px;min-width:90px;">Necessário</th>
+                            <th style="padding:8px 12px;min-width:90px;">Requisitado</th>
+                            <th style="padding:8px 12px;min-width:90px;">Pendente</th>
+                            <th style="padding:8px 12px;min-width:90px;">Estoque</th>
+                            <th style="padding:8px 12px;min-width:110px;">Status</th>
+                            <th style="padding:8px 12px;min-width:110px;">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
             `;
-            demandas.forEach(demanda => {
+            grupo.demandas.forEach(demanda => {
                 const pendente = parseFloat(demanda.QTDE_PENDENTE || 0);
                 const status = pendente > 0 ? '<span style="color:#e74c3c;font-weight:bold;">Não Requisitada</span>' : '<span style="color:#27ae60;">OK</span>';
-                if (pendente > 0) temNaoRequisitada = true;
                 html += `
                     <tr style="${pendente > 0 ? 'background:#fff3cd;' : ''}">
-                        <td style="padding:8px 18px;">${demanda.COD_ITEM}</td>
-                        <td style="padding:8px 18px;">${demanda.DESC_TECNICA || ''}</td>
-                        <td style="padding:8px 18px;">${demanda.QTDE_NECES || 0}</td>
-                        <td style="padding:8px 18px;">${demanda.QTDE_REQUIS || 0}</td>
-                        <td style="padding:8px 18px;">${pendente}</td>
-                        <td style="padding:8px 18px;">${demanda.SALDO_ATUAL || 0}</td>
-                        <td style="padding:8px 18px;">${status}</td>
+                        <td style="padding:8px 12px;">${demanda.COD_ITEM}</td>
+                        <td style="padding:8px 12px;">${demanda.DESC_TECNICA || ''}</td>
+                        <td style="padding:8px 12px;">${demanda.QTDE_NECES || 0}</td>
+                        <td style="padding:8px 12px;">${demanda.QTDE_REQUIS || 0}</td>
+                        <td style="padding:8px 12px;">${pendente}</td>
+                        <td style="padding:8px 12px;">${typeof demanda.SALDO_ATUAL !== 'undefined' && demanda.SALDO_ATUAL !== null ? demanda.SALDO_ATUAL : 0}</td>
+                        <td style="padding:8px 12px;">${status}</td>
+                        <td style="padding:8px 12px;">
+                            <button class="modal-action-btn" style="padding:4px 10px;font-size:0.9em;" onclick="window.requisitarDemandaLinha('${numero_ordem}', '${seq}', '${demanda.COD_ITEM}', '${demanda.QTDE_PENDENTE}', '${demanda.SEQ_DEMANDA}')" ${pendente === 0 ? 'disabled' : ''}>Requisitar</button>
+                        </td>
                     </tr>
                 `;
             });
             html += `</tbody></table></div>`;
-            if (!temNaoRequisitada) {
-                html += `<div style=\"color:#27ae60;text-align:center;\">Todas as demandas já foram requisitadas para esta sequência.</div>`;
-            }
         });
+        // Requisitar demanda linha a linha
+        window.requisitarDemandaLinha = async function(numero_ordem, seq, cod_item, qtde_pendente, seq_demanda) {
+            if (parseFloat(qtde_pendente) === 0) {
+                alert('Demanda já requisitada!');
+                return;
+            }
+            // Log detalhado dos dados coletados e enviados
+            const codFoccoInput = document.getElementById('codigo-focco-requisitante');
+            const codFocco = codFoccoInput && codFoccoInput.value ? codFoccoInput.value : (sessionStorage.getItem('codigo_focco') || '');
+            const dadosColetados = {
+                numero_ordem_coletado: numero_ordem,
+                seq_coletado: seq,
+                cod_item_coletado: cod_item,
+                qtde_pendente_coletado: qtde_pendente,
+                cod_focco_coletado: codFocco,
+                seq_demanda_coletado: seq_demanda
+            };
+            const dadosPost = {
+                cod_emp: 1,
+                num_ordem: numero_ordem,
+                cod_item: (cod_item || '').trim().toUpperCase(),
+                qtde: qtde_pendente,
+                cod_func: codFocco,
+                codigo_focco: codFocco
+                // seq_demanda removido
+            };
+            const formData = new FormData();
+            formData.append('cod_emp', 1);
+            formData.append('num_ordem', numero_ordem);
+            formData.append('cod_item', (cod_item || '').trim().toUpperCase());
+            formData.append('qtde', qtde_pendente);
+            formData.append('cod_func', codFocco);
+            formData.append('codigo_focco', codFocco);
+            // seq_demanda removido
+            // ...existing code...
+            const resp = await fetch('Requisicao/index.php', { method: 'POST', body: formData });
+            const res = await resp.json();
+            if (!res.success) {
+                alert('Erro ao requisitar item ' + cod_item + ': ' + (res.message || 'Erro desconhecido'));
+            } else {
+                alert('Demanda requisitada com sucesso!');
+                window.abrirDemandas(numero_ordem, seq);
+            }
+        };
         abrirModal(`Demandas da Ordem ${numero_ordem}`, html);
     } catch (error) {
         abrirModal('Demandas da Ordem', `<div style=\"color:red;padding:20px;\">Erro ao buscar demandas: ${error.message}</div>`);
@@ -1122,6 +1171,8 @@ window.requisitarDemandas = async function(numero_ordem, sequencia) {
         alert('Nenhuma demanda encontrada para esta sequência.');
         return;
     }
+    const codFoccoInput = document.getElementById('codigo-focco-requisitante');
+    const codFocco = codFoccoInput && codFoccoInput.value ? codFoccoInput.value : (sessionStorage.getItem('codigo_focco') || '');
     for (const demanda of demandasSeq) {
         if (parseFloat(demanda.QTDE_PENDENTE) > 0) {
             const formData = new FormData();
@@ -1129,7 +1180,8 @@ window.requisitarDemandas = async function(numero_ordem, sequencia) {
             formData.append('num_ordem', numero_ordem);
             formData.append('cod_item', demanda.COD_ITEM);
             formData.append('qtde', demanda.QTDE_PENDENTE);
-            formData.append('cod_func', sessionStorage.getItem('codigo_focco') || '');
+            formData.append('cod_func', codFocco);
+            formData.append('codigo_focco', codFocco);
             formData.append('seq_demanda', demanda.SEQ_DEMANDA);
             const resp = await fetch('Requisicao/index.php', { method: 'POST', body: formData });
             const res = await resp.json();

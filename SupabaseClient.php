@@ -64,7 +64,7 @@ class SupabaseClient {
         return $this->execute('POST', $table, $data);
     }
 
-    public function update($table, $query, $data) {
+    public function update($table, $data, $query) {
         return $this->execute('PATCH', "{$table}?{$query}", $data);
     }
 

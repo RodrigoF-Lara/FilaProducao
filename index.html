@@ -27,6 +27,7 @@
           <span id="user-info"></span>
           <a href="usuarios.html" id="users-btn" class="users-btn">Usuários</a>
           <button id="logout-btn" class="logout-btn">Sair</button>
+            <button id="btn-sincronizar-finalizacao" style="margin-right:16px;">Sincronizar Finalização</button>
         </div>
       </header>
 
@@ -315,5 +316,45 @@
     </div>
 
     <script src="script.js?v=20260206-1670"></script>
+      <script>
+      document.getElementById('btn-sincronizar-finalizacao').onclick = async function() {
+        const btn = this;
+        btn.disabled = true;
+        btn.textContent = 'Sincronizando...';
+        try {
+          const resp = await fetch('sincronizar_finalizacao.php');
+          const text = await resp.text();
+          let res;
+          try {
+            res = JSON.parse(text);
+          } catch (err) {
+            alert('Erro ao sincronizar: ' + err + '\n' + text);
+            btn.disabled = false;
+            btn.textContent = 'Sincronizar Finalização';
+            return;
+          }
+          alert(res.message || 'Sincronização concluída!');
+        } catch (e) {
+          alert('Erro ao sincronizar: ' + e.message);
+        }
+        btn.disabled = false;
+        btn.textContent = 'Sincronizar Finalização';
+      };
+      // Agendamento automático a cada 5 minutos
+      setInterval(() => {
+        fetch('sincronizar_finalizacao.php')
+          .then(resp => resp.text())
+          .then(text => {
+            try {
+              const res = JSON.parse(text);
+            } catch (err) {
+              // erro silencioso
+            }
+          })
+          .catch(e => {
+            // erro silencioso
+          });
+      }, 5 * 60 * 1000);
+      </script>
   </body>
 </html>

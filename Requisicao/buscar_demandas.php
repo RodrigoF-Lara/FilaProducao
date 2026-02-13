@@ -6,20 +6,30 @@ require_once 'config_oracle.php';
 // error_reporting(E_ALL);
 // ini_set('display_errors', 1);
 
+
 $num_ordem = filter_input(INPUT_GET, 'num_ordem', FILTER_VALIDATE_INT);
 $cod_emp = filter_input(INPUT_GET, 'cod_emp', FILTER_VALIDATE_INT);
 $response = ['success' => false, 'data' => [], 'error' => null];
 
+// LOG: parâmetros recebidos
+$logFile = __DIR__ . '/log_buscar_demandas.txt';
+$logMsg = date('Y-m-d H:i:s') . " | Parâmetros recebidos: num_ordem={$num_ordem}, cod_emp={$cod_emp}\n";
+file_put_contents($logFile, $logMsg, FILE_APPEND);
+
+
 if (!$num_ordem || !$cod_emp) {
     $response['error'] = 'Número da Ordem e Código da Empresa são obrigatórios.';
+    file_put_contents($logFile, date('Y-m-d H:i:s') . " | ERRO: Parâmetros obrigatórios ausentes\n", FILE_APPEND);
     echo json_encode($response);
     exit;
 }
 
 $oracle = getOracleConnection();
 
+
 if (!$oracle->connect()) {
     $response['error'] = 'Erro de conexão: ' . $oracle->getError();
+    file_put_contents($logFile, date('Y-m-d H:i:s') . " | ERRO: Erro de conexão: " . $oracle->getError() . "\n", FILE_APPEND);
     echo json_encode($response);
     exit;
 }
@@ -34,9 +44,19 @@ $sql = 'SELECT
     E.QTDE AS qtde_neces,
     E.QTDE_REQUIS AS qtde_requis,
     E.QTDE_PENDENTE AS qtde_pendente,
-    E.SEQ_DEMANDA AS seq_demanda,
+    B.SEQ AS seq_demanda,
+    C.DESCRICAO AS DESC_OPERACAO,
     E.ALMOX_ID AS almox_id,
-    F.DESCRICAO AS desc_almoxarifado
+    F.DESCRICAO AS desc_almoxarifado,
+    NVL((
+        SELECT SLD_ATUAL FROM (
+            SELECT e2.SLD_ATUAL
+            FROM focco3i.testq e2
+            INNER JOIN focco3i.titens_estoque f2 ON e2.itestq_id = f2.id
+            WHERE f2.cod_item = T_DEM.COD_ITEM AND e2.ALMOX_ID NOT IN (749, 2454)
+            ORDER BY e2.DT_SIST DESC
+        ) WHERE ROWNUM = 1
+    ), 0) AS SALDO_ATUAL
 FROM
     FOCCO3I.TORDENS A
     INNER JOIN FOCCO3I.TITENS_PLANEJAMENTO TP_ORDEM ON A.ITPL_ID = TP_ORDEM.ID
@@ -64,13 +84,20 @@ $params = [
     
 ];
 
+
+// LOG: SQL executado
+file_put_contents($logFile, date('Y-m-d H:i:s') . " | SQL executado: $sql\nParâmetros: " . print_r($params, true) . "\n", FILE_APPEND);
+
 $resultados = $oracle->executeQuery($sql, $params);
+
 
 if ($resultados !== false) {
     $response['success'] = true;
     $response['data'] = $resultados;
+    file_put_contents($logFile, date('Y-m-d H:i:s') . " | Resultados encontrados: " . count($resultados) . "\n", FILE_APPEND);
 } else {
     $response['error'] = 'Erro ao buscar demandas: ' . $oracle->getError();
+    file_put_contents($logFile, date('Y-m-d H:i:s') . " | ERRO: Erro ao buscar demandas: " . $oracle->getError() . "\n", FILE_APPEND);
 }
 
 $oracle->close();

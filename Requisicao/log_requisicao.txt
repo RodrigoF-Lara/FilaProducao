@@ -1,0 +1,202 @@
+POST recebido: Array
+(
+    [cod_emp] => 1
+    [num_ordem] => 18941598
+    [cod_item] => 067079-A
+    [qtde] => 2
+    [cod_func] => 001009
+    [codigo_focco] => 001009
+    [seq_demanda] => 40
+)
+
+Resultado procedure: Array
+(
+    [success] => 
+    [error] => Não foi localizada a demanda do item "067079-A" na ordem 18941598.
+)
+
+POST recebido: Array
+(
+    [cod_emp] => 1
+    [num_ordem] => 18992148
+    [cod_item] => 13632
+    [qtde] => 16.2
+    [cod_func] => 001009
+    [codigo_focco] => 001009
+    [seq_demanda] => 10
+)
+
+Resultado procedure: Array
+(
+    [success] => 
+    [error] => Não foi localizada a demanda do item "13632" na ordem 18992148.
+)
+
+POST recebido: Array
+(
+    [cod_emp] => 1
+    [num_ordem] => 18992148
+    [cod_item] => 3100079644
+    [qtde] => 4
+    [cod_func] => 002
+    [codigo_focco] => 002
+    [seq_demanda] => 10
+)
+
+Resultado procedure: Array
+(
+    [success] => 
+    [error] => Não foi localizada a demanda do item "3100079644" na ordem 18992148.
+)
+
+POST recebido: Array
+(
+    [cod_emp] => 1
+    [num_ordem] => 18992148
+    [cod_item] => 3100079644
+    [qtde] => 4
+    [cod_func] => 001009
+    [codigo_focco] => 001009
+    [seq_demanda] => 10
+)
+
+Resultado procedure: Array
+(
+    [success] => 
+    [error] => Não foi localizada a demanda do item "3100079644" na ordem 18992148.
+)
+
+POST recebido: Array
+(
+    [cod_emp] => 1
+    [num_ordem] => 18992148
+    [cod_item] => 13632
+    [qtde] => 16.2
+    [cod_func] => 001009
+    [codigo_focco] => 001009
+    [seq_demanda] => 10
+)
+
+Resultado procedure: Array
+(
+    [success] => 
+    [error] => Não foi localizada a demanda do item "13632" na ordem 18992148.
+)
+
+POST recebido: Array
+(
+    [cod_emp] => 1
+    [num_ordem] => 18992148
+    [cod_item] => 13632
+    [qtde] => 16.2
+    [cod_func] => 001009
+    [codigo_focco] => 001009
+    [seq_demanda] => 10
+)
+
+Resultado procedure: Array
+(
+    [success] => 
+    [error] => Não foi localizada a demanda do item "13632" na ordem 18992148.
+)
+
+POST recebido: Array
+(
+    [cod_emp] => 1
+    [num_ordem] => 18992148
+    [cod_item] => 13632
+    [qtde] => 16.2
+    [cod_func] => 001009
+    [codigo_focco] => 001009
+    [seq_demanda] => 10
+)
+
+Resultado procedure: Array
+(
+    [success] => 
+    [error] => Não foi localizada a demanda do item "13632" na ordem 18992148.
+)
+
+POST recebido: Array
+(
+    [cod_emp] => 1
+    [num_ordem] => 18941597
+    [cod_item] => 067080-A
+    [qtde] => 1
+    [cod_func] => 001009
+    [codigo_focco] => 001009
+    [seq_demanda] => 10
+)
+
+Resultado procedure: Array
+(
+    [success] => 
+    [error] => Não foi localizada a demanda do item "067080-A" na ordem 18941597.
+)
+
+POST recebido: Array
+(
+    [cod_emp] => 1
+    [num_ordem] => 18941597
+    [cod_item] => 067080-A
+    [qtde] => 1
+    [cod_func] => 001009
+    [codigo_focco] => 001009
+    [seq_demanda] => 10
+)
+
+Resultado procedure: Array
+(
+    [success] => 
+    [error] => Não foi localizada a demanda do item "067080-A" na ordem 18941597.
+)
+
+POST recebido: Array
+(
+    [cod_emp] => 1
+    [num_ordem] => 18941597
+    [cod_item] => 067080-A
+    [qtde] => 1
+    [cod_func] => 001009
+    [codigo_focco] => 001009
+    [seq_demanda] => 10
+)
+
+Resultado procedure: Array
+(
+    [success] => 
+    [error] => Não foi localizada a demanda do item "067080-A" na ordem 18941597.
+)
+
+POST recebido: Array
+(
+    [cod_emp] => 1
+    [num_ordem] => 18941597
+    [cod_item] => 067080-A
+    [qtde] => 1
+    [cod_func] => 001009
+    [codigo_focco] => 001009
+)
+
+Resultado procedure: Array
+(
+    [success] => 1
+    [error] => 
+)
+
+POST recebido: Array
+(
+    [cod_emp] => 1
+    [num_ordem] => 18941597
+    [cod_item] => 18757
+    [qtde] => 13.08
+    [cod_func] => 001009
+    [codigo_focco] => 001009
+)
+
+Resultado procedure: Array
+(
+    [success] => 1
+    [error] => 
+)
+
