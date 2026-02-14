@@ -1,5 +1,3 @@
-console.log('%c🚀 PPCP SCRIPT CARREGADO', 'color: #e74c3c; font-weight: bold; font-size: 14px;');
-
 // ========== VERIFICAÇÃO DE AUTENTICAÇÃO ==========
 (async function() {
     // Verificar se está logado no sessionStorage
@@ -419,7 +417,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     window.mudarStatus = async (setor, ordem, sequencia, operacao, novoStatus) => {
-        console.log('[LOG mudarStatus] Início', { setor, ordem, sequencia, operacao, novoStatus });
         const info = encontrarItemDetalhado(setor, ordem, sequencia, operacao);
         if (!info) {
             console.error('[LOG mudarStatus] Não encontrou info detalhada', { setor, ordem, sequencia, operacao });
@@ -428,7 +425,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const { tipo: tipoAtual } = info;
         if (tipoAtual === novoStatus) {
-            console.log('[LOG mudarStatus] Status já está no valor desejado', { tipoAtual, novoStatus });
             return; // Não faz nada se o status for o mesmo
         }
 
@@ -446,7 +442,7 @@ document.addEventListener('DOMContentLoaded', () => {
             status_anterior: tipoAtual,
             status_novo: statusNovoCorrigido
         };
-        console.log('[LOG mudarStatus] Payload montado', payload);
+       
 
         try {
             const resp = await fetch('status_api.php', {
@@ -454,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            console.log('[LOG mudarStatus] Resposta status_api.php', resp);
+
             if (!resp.ok) {
                 const erro = await resp.text();
                 console.error('[LOG mudarStatus] Erro HTTP', erro);
@@ -463,7 +459,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             fecharModal();
             await carregarDados();
-            console.log('[LOG mudarStatus] Status alterado e dados recarregados');
+            
         } catch (error) {
             console.error('[LOG mudarStatus] Exceção', error);
             alert('Erro ao mudar status: ' + error.message);
@@ -620,68 +616,63 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.abrirAcoes = async (setor, ordem, sequencia, operacao) => {
         const info = encontrarItemDetalhado(setor, ordem, sequencia, operacao);
-        if (!info) {
-            console.error("Item não encontrado:", { setor, ordem, sequencia, operacao });
-            return;
+        console.log('setor, ordem, sequencia, operacao:', { setor, ordem, sequencia, operacao });
+        if (!info) { 
+            console.error("Item não encontrado:", { setor, ordem, sequencia, operacao }); 
+            return; 
         }
-
-        const { item, tipo } = info;
-        
         try {
-            // Função para buscar histórico: GET para APIs de histórico
-            const fetchHistory = async (url, body) => {
-                const historicoApis = [
-                    'logs_producao_api.php',
-                    'movimentacao_api.php',
-                    'separacao_api.php',
-                    'status_api.php'
-                ];
-                if (historicoApis.includes(url) && body.numero_ordem) {
-                    // Para separacao_api.php, busca só por numero_ordem e sequencia
-                    if (url === 'separacao_api.php') {
-                        const params = new URLSearchParams({ numero_ordem: body.numero_ordem, sequencia: body.sequencia }).toString();
-                        const response = await fetch(`${url}?${params}`, { method: 'GET' });
-                        if (!response.ok) {
-                            console.error(`Erro na resposta da API ${url}:`, await response.text());
-                            throw new Error(`Falha na API ${url}`);
-                        }
-                        return response.json();
+            const { item, tipo } = info;
+            // Buscar históricos antes de montar o modal
+            // Função para salvar a nova data/hora da posição na fila
+            window.salvarPosicaoFila = async function(numero_ordem, sequencia, operacao) {
+                const input = document.getElementById('input-posicao-fila');
+                if (!input) {
+                    alert('Campo de data/hora não encontrado.');
+                    return;
+                }
+                const novaData = input.value;
+                if (!novaData) {
+                    alert('Selecione uma data/hora válida.');
+                    return;
+                }
+                // Converte para formato ISO completo
+                const dataISO = new Date(novaData).toISOString();
+                try {
+                    // PATCH precisa identificar a linha correta: use id ou chave composta
+                    const response = await fetch('console_ordens_api.php', {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            numero_ordem,
+                            sequencia,
+                            operacao,
+                            posicao_fila: dataISO,
+                            // Se tiver id, envie também
+                            // id: idLinhaHistoricoStatus
+                        })
+                    });
+                    const result = await response.json();
+                    if (result.success && result.updated) {
+                        alert('Data/hora atualizada com sucesso!');
+                        fecharModal();
+                        window.location.reload();
                     } else {
-                        // Para as demais, mantém busca só por numero_ordem
-                        const params = new URLSearchParams({ numero_ordem: body.numero_ordem }).toString();
-                        const response = await fetch(`${url}?${params}`, { method: 'GET' });
-                        if (!response.ok) {
-                            console.error(`Erro na resposta da API ${url}:`, await response.text());
-                            throw new Error(`Falha na API ${url}`);
-                        }
-                        return response.json();
+                        alert('Erro ao atualizar data/hora: ' + (result.message || 'Erro desconhecido.'));
                     }
+                } catch (error) {
+                    alert('Erro ao salvar data/hora: ' + error);
                 }
-                // POST para criação
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
-                if (!response.ok) {
-                    console.error(`Erro na resposta da API ${url}:`, await response.text());
-                    throw new Error(`Falha na API ${url}`);
-                }
-                return response.json();
-            };
-
-            // Para histórico de separação, não envia operacao
-            const bodyBase = { numero_ordem: ordem, sequencia: sequencia };
-            const bodyOnlyNumero = { numero_ordem: ordem };
-
+            }
             const [resComentarios, resMovimentacoes, resSeparacao, resStatus] = await Promise.all([
-                fetchHistory('logs_producao_api.php', bodyOnlyNumero),
-                fetchHistory('movimentacao_api.php', bodyOnlyNumero),
-                fetchHistory('separacao_api.php', bodyBase),
-                fetchHistory('status_api.php', bodyOnlyNumero)
+                fetch('logs_producao_api.php?numero_ordem=' + item.numero_ordem).then(r => r.json()),
+                fetch('movimentacao_api.php?numero_ordem=' + item.numero_ordem).then(r => r.json()),
+                fetch('separacao_api.php?numero_ordem=' + item.numero_ordem + '&sequencia=' + item.sequencia).then(r => r.json()),
+                fetch('status_api.php?numero_ordem=' + item.numero_ordem).then(r => r.json())
             ]);
 
-            // Atribui os dados do histórico ao item ANTES de renderizar
             item.comentarios = resComentarios.success ? resComentarios.data.map(c => ({ 
                 data: new Date(c.created_at).toLocaleString('pt-BR'),
                 colaborador: c.colaborador,
@@ -691,13 +682,136 @@ document.addEventListener('DOMContentLoaded', () => {
             item.historicoSeparacao = resSeparacao.success ? resSeparacao.data : [];
             item.historicoStatus = resStatus.success ? resStatus.data : [];
 
+            const statusLabels = {
+                producao: 'Produção',
+                separacao: 'Separação',
+                componentes: 'Componentes'
+            };
+
+            const setoresDisponiveis = Object.keys(dadosSetores)
+                .filter(s => s !== setor)
+                .map(s => `<option value="${s}">${s.toUpperCase()}</option>`)
+                .join('');
+            const statusOptions = ['producao', 'separacao', 'componentes']
+                .map(s => `<option value="${s}" ${s === tipo ? 'selected' : ''}>${statusLabels[s]}</option>`)
+                .join('');
+            const historicoStatusHtml = item.historicoStatus.length
+                ? `<ul class="modal-list">${item.historicoStatus.map(h => {
+                    const dataFormatada = new Date(h.data_movimentacao).toLocaleString('pt-BR');
+                    const origem = h.status_anterior ? statusLabels[h.status_anterior] : 'Inicial';
+                    const destino = statusLabels[h.status_novo] || h.status_novo;
+                    return `<li>${dataFormatada}: ${origem} → ${destino} por <strong>${h.colaborador}</strong></li>`;
+                }).join('')}</ul>`
+                : '<p class="modal-muted">Sem histórico de status.</p>';
+            const historicoMovHtml = item.historicoMovimentacoes.length
+                ? `<ul class="modal-list">${item.historicoMovimentacoes.map(h => {
+                    return `<li>${new Date(h.data_movimentacao).toLocaleString('pt-BR')}: ${h.setor_origem.toUpperCase()} → ${h.setor_destino.toUpperCase()} por <strong>${h.colaborador}</strong></li>`;
+                }).join('')}</ul>`
+                : '<p class="modal-muted">Sem movimentações registradas.</p>';
+            const historicoSeparacaoHtml = item.historicoSeparacao.length
+                ? `<ul class="modal-list">${item.historicoSeparacao.map(h => {
+                    const dataFormatada = new Date(h.data_acao).toLocaleString('pt-BR');
+                    return `<li>${dataFormatada}: Ação <strong>${h.acao}</strong> por Focco: <strong>${h.colaborador_codigo_focco}</strong></li>`;
+                }).join('')}</ul>`
+                : '<p class="modal-muted">Sem registros de separação.</p>';
+            const comentariosHtml = item.comentarios.length
+                ? `<ul class="modal-list">${item.comentarios.map(c => `<li>${formatarComentario(c)}</li>`).join('')}</ul>`
+                : '<p class="modal-muted">Nenhum comentário adicionado.</p>';
+            let separacaoEstadoHtml = '';
+            let separacaoAcoesHtml = '';
+            if (tipo !== 'separacao') {
+                separacaoEstadoHtml = '<p class="modal-muted">Mova para Separação para iniciar o processo.</p>';
+            } else {
+                const ultimoEvento = item.historicoSeparacao[0];
+                if (!ultimoEvento || ultimoEvento.acao === 'FIM') {
+                    separacaoEstadoHtml = '<p class="modal-muted">Separação não iniciada.</p>';
+                    separacaoAcoesHtml = `<button class="modal-action-btn" onclick="salvarInicioSeparacao('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Iniciar separação</button>`;
+                } else if (ultimoEvento.acao === 'INICIO' || ultimoEvento.acao === 'RETOMADA') {
+                    separacaoEstadoHtml = `<p><strong>Status:</strong> Em andamento por Focco: ${ultimoEvento.colaborador_codigo_focco}</p>`;
+                    separacaoAcoesHtml = `
+                        <button class="modal-action-btn secondary" onclick="pausarSeparacao('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Pausar</button>
+                        <button class="modal-action-btn" onclick="finalizarSeparacao('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Finalizar</button>
+                    `;
+                } else if (ultimoEvento.acao === 'PAUSA') {
+                    separacaoEstadoHtml = `<p><strong>Status:</strong> Pausada por Focco: ${ultimoEvento.colaborador_codigo_focco}</p>`;
+                    separacaoAcoesHtml = `
+                        <button class="modal-action-btn" onclick="retomarSeparacao('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Retomar</button>
+                        <button class="modal-action-btn" onclick="finalizarSeparacao('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Finalizar</button>
+                    `;
+                }
+            }
+            const posicaoFilaISO = item.posicao_fila ? new Date(item.posicao_fila).toISOString().slice(0,16) : '';
+            const campoDataHtml = `
+                <div class="form-group">
+                    <label for="input-posicao-fila">Data/Hora na Fila</label>
+                    <input type="datetime-local" id="input-posicao-fila" value="${posicaoFilaISO}">
+                    <button class="modal-action-btn" onclick="salvarPosicaoFila('${item.numero_ordem}', ${item.sequencia}, '${item.operacao}')">Salvar</button>
+                    <span style="color:#888;font-size:0.95em;">Altere para subir/descer a ordem na fila.</span>
+                </div>
+            `;
+            const content = `
+                ${campoDataHtml}
+                <div class="modal-summary">
+                    <div><strong>Ordem:</strong> ${item.numero_ordem}</div>
+                    <div><strong>Sequência:</strong> ${item.sequencia}</div>
+                    <div><strong>Operação:</strong> ${item.operacao}</div>
+                    <div><strong>Código:</strong> ${item.cod_item}</div>
+                    <div><strong>Cliente:</strong> ${item.cliente}</div>
+                    <div><strong>Quantidade:</strong> ${item.qtde}</div>
+                </div>
+
+                <div class="modal-section">
+                    <h3>Separação</h3>
+                    ${separacaoEstadoHtml}
+                    <div class="modal-actions-row">
+                        ${separacaoAcoesHtml}
+                    </div>
+                    <div class="modal-subsection">
+                        <h4>Histórico de separação</h4>
+                        ${historicoSeparacaoHtml}
+                    </div>
+                </div>
+
+                <div class="modal-section">
+                    <h3>Comentários</h3>
+                    ${comentariosHtml}
+                    <div class="form-group">
+                        <label for="novo-comentario">Novo comentário</label>
+                        <textarea id="novo-comentario" rows="3" placeholder="Digite o comentário"></textarea>
+                    </div>
+                    <button class="modal-action-btn" onclick="salvarComentario('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Adicionar</button>
+                </div>
+
+                <div class="modal-section">
+                    <h3>Movimentações</h3>
+                    <div class="form-group">
+                        <label for="setor-destino">Mover para outro setor</label>
+                        <select id="setor-destino">${setoresDisponiveis}</select>
+                    </div>
+                    <button class="modal-action-btn" onclick="salvarMudancaSetor('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Mover ordem</button>
+                    <div class="modal-subsection">
+                        <h4>Histórico de movimentações</h4>
+                        ${historicoMovHtml}
+                    </div>
+                </div>
+
+                <div class="modal-section">
+                    <h3>Status</h3>
+                    <div class="form-group">
+                        <label for="status-select">Atualizar status</label>
+                        <select id="status-select">${statusOptions}</select>
+                    </div>
+                    <button class="modal-action-btn" onclick="confirmarMudancaStatus('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Atualizar status</button>
+                    <div class="modal-subsection">
+                        <h4>Linha do tempo</h4>
+                        ${historicoStatusHtml}
+                    </div>
+                </div>
+            `;
+
+            abrirModal(`Ações - Ordem ${ordem}`, content);
         } catch (error) {
             console.error(`Erro ao buscar históricos para a ordem ${ordem}:`, error);
-            // Garante que os arrays existam mesmo com erro para não quebrar a UI
-            item.comentarios = item.comentarios || [];
-            item.historicoMovimentacoes = item.historicoMovimentacoes || [];
-            item.historicoSeparacao = item.historicoSeparacao || [];
-            item.historicoStatus = item.historicoStatus || [];
         }
         
         const statusLabels = {
@@ -1013,24 +1127,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Usa posicao_fila (timestampz) para a data, formatando para pt-BR
                 let dataFila = '';
                 if (item.posicao_fila) {
-                    console.log('[DATA DEBUG] posicao_fila bruto:', item.posicao_fila, 'tipo:', typeof item.posicao_fila);
                     try {
                         const dt = new Date(item.posicao_fila);
-                        console.log('[DATA DEBUG] Date construído:', dt, 'timestamp:', dt.getTime());
                         if (!isNaN(dt.getTime())) {
                             dataFila = dt.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-                            console.log('[DATA DEBUG] dataFila formatado:', dataFila);
-                        } else {
+                            } else {
                             dataFila = item.posicao_fila;
-                            console.warn('[DATA DEBUG] Date inválido, usando valor bruto:', dataFila);
+                            
                         }
                     } catch (e) {
                         dataFila = item.posicao_fila;
-                        console.error('[DATA DEBUG] Erro ao converter data:', e, 'usando valor bruto:', dataFila);
-                    }
+                        }
                 } else {
-                    console.warn('[DATA DEBUG] posicao_fila não existe para item:', item);
-                }
+                     }
                 return `
                     <tr class="${rowClass}" data-ordem="${item.numero_ordem}" data-sequencia="${item.sequencia}" data-operacao="${item.operacao}">
                         <td>${dataFila}${infoExtraHtml}</td>
@@ -1107,7 +1216,7 @@ window.abrirDemandas = async function(numero_ordem, sequencia) {
             return null;
         })();
         if (ordemInfo) {
-            console.log('[IMPRESSAO] ordemInfo:', ordemInfo);
+           
             // Usa posicao_fila (timestampz) para a data
             if (ordemInfo.posicao_fila) {
                 try {
@@ -1125,9 +1234,9 @@ window.abrirDemandas = async function(numero_ordem, sequencia) {
             }
             cliente = ordemInfo.cliente || '';
             quantidade = ordemInfo.qnt || ordemInfo.qtde || ordemInfo.Qnt || ordemInfo.QTDE || ordemInfo.quantidade || '';
-            console.log('[IMPRESSAO] quantidade:', quantidade);
+           
         } else {
-            console.log('[IMPRESSAO] ordemInfo não encontrada para ordem', numero_ordem);
+           
         }
         if (typeof quantidade === 'undefined') quantidade = '';
         // Botão de imprimir e campo para código focco do requisitante
@@ -1321,7 +1430,7 @@ window.requisitarDemandas = async function(numero_ordem, sequencia) {
                 const result = await fetchFn(item);
                 processed++;
                 const percent = Math.round((processed / items.length) * 100);
-                console.log(`⏳ Progresso: ${processed}/${items.length} (${percent}%)`);
+               
                 return { item, result, originalIdx: i + idx };
             }));
             

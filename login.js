@@ -1,5 +1,3 @@
-// Adicionando um log para confirmar que a versão correta do arquivo foi carregada.
-console.log('Versão corrigida do login.js carregada com sucesso.');
 
 document.addEventListener('DOMContentLoaded', function () {
     const loginForm = document.getElementById('login-form');
