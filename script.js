@@ -1,3 +1,23 @@
+import {
+    verificarSessao,
+    fazerLogout,
+    mudarStatus as apiMudarStatus,
+    salvarComentario as apiSalvarComentario,
+    gerenciarSeparacao,
+    moverOrdemParaSetor,
+    buscarHistoricos,
+    salvarPosicaoFila as apiSalvarPosicaoFila,
+    buscarEnderecoSupabase,
+    buscarDemandas,
+    requisitarDemanda,
+    requisitarDemandasDaSequencia,
+    sincronizarComFocco as apiSincronizarComFocco,
+    carregarDadosIniciais,
+    buscarDadosSeparacao
+} from './api.js';
+
+console.log('%c🚀 PPCP SCRIPT CARREGADO', 'color: #e74c3c; font-weight: bold; font-size: 14px;');
+
 // ========== VERIFICAÇÃO DE AUTENTICAÇÃO ==========
 (async function() {
     // Verificar se está logado no sessionStorage
@@ -5,19 +25,10 @@
         window.location.href = 'login.html';
         return;
     }
-
     // Verificar sessão no servidor
-    try {
-        const sessionResponse = await fetch('check_session.php?api=true');
-        if (!sessionResponse.ok) {
-            sessionStorage.clear();
-            window.location.href = 'login.html';
-            return;
-        }
-    } catch (error) {
-        console.warn('Não foi possível verificar a sessão do servidor:', error);
-    }
+    await verificarSessao();
 })();
+
 
 // Obter dados do usuário da sessão (com chaves corrigidas)
 const usuarioLogado = sessionStorage.getItem('usuario');
@@ -96,18 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Adiciona a funcionalidade de logout ao botão
     if (logoutBtn) {
-        logoutBtn.addEventListener('click', async () => {
-            try {
-                // Tenta fazer o logout no servidor primeiro
-                await fetch('logout.php', { method: 'POST' });
-            } catch (error) {
-                console.error('Falha ao comunicar com o script de logout, mas prosseguindo com o logout no cliente.', error);
-            } finally {
-                // Garante que a sessão do navegador seja limpa e redirecione
-                sessionStorage.clear();
-                window.location.href = 'login.html';
-            }
-        });
+        logoutBtn.addEventListener('click', fazerLogout);
     }
 
     // Controla a visibilidade do botão de "Usuários" com base no nível de acesso
@@ -415,6 +415,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const resultado = encontrarItemDetalhado(setor, ordem, sequencia, operacao);
         return resultado ? resultado.item : null;
     };
+
+    function encontrarItemEmTodosOsSetores(numero_ordem) {
+        for (const setor of Object.values(dadosSetores)) {
+            for (const tipo of ['producao', 'separacao', 'componentes']) {
+                const ordem = setor[tipo].dados.find(o => String(o.numero_ordem) === String(numero_ordem));
+                if (ordem) return ordem;
+            }
+        }
+        return null;
+    }
+    
     
     window.mudarStatus = async (setor, ordem, sequencia, operacao, novoStatus) => {
         const info = encontrarItemDetalhado(setor, ordem, sequencia, operacao);
@@ -422,47 +433,15 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('[LOG mudarStatus] Não encontrou info detalhada', { setor, ordem, sequencia, operacao });
             return;
         }
-
         const { tipo: tipoAtual } = info;
-        if (tipoAtual === novoStatus) {
-            return; // Não faz nada se o status for o mesmo
-        }
-
-        // Garantia extra: setor e status_novo nunca vazios
-        const setorCorrigido = setor || (info.item && info.item.setor) || 'indefinido';
-        const statusNovoCorrigido = novoStatus || 'indefinido';
-
-        // Trunca operacao para no máximo 100 caracteres
-        const operacaoTrunc = operacao && operacao.length > 100 ? operacao.substring(0, 100) : operacao;
-        const payload = {
-            numero_ordem: ordem,
-            sequencia: sequencia,
-            operacao: operacaoTrunc,
-            setor: setorCorrigido,
-            status_anterior: tipoAtual,
-            status_novo: statusNovoCorrigido
-        };
-       
+        if (tipoAtual === novoStatus) return;
 
         try {
-            const resp = await fetch('status_api.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!resp.ok) {
-                const erro = await resp.text();
-                console.error('[LOG mudarStatus] Erro HTTP', erro);
-                alert('Erro ao mudar status: ' + erro);
-                return;
-            }
+            await apiMudarStatus(ordem, sequencia, operacao, setor, tipoAtual, novoStatus);
             fecharModal();
             await carregarDados();
-            
         } catch (error) {
-            console.error('[LOG mudarStatus] Exceção', error);
-            alert('Erro ao mudar status: ' + error.message);
+            alert(error.message);
         }
     };
 
@@ -477,33 +456,18 @@ document.addEventListener('DOMContentLoaded', () => {
     window.salvarComentario = async (setor, ordem, sequencia, operacao) => {
         const input = document.getElementById('novo-comentario');
         const texto = input ? input.value.trim() : '';
-        
         if (!texto) {
             alert('Por favor, digite um comentário.');
             return;
         }
-
         const item = encontrarItem(setor, ordem, sequencia, operacao);
         if (!item) {
-            alert('Erro: não foi possível encontrar os dados da ordem para salvar o log completo.');
+            alert('Erro: não foi possível encontrar os dados da ordem.');
             return;
         }
-
         try {
-            await fetch('logs_producao_api.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    numero_ordem: ordem,
-                    sequencia: sequencia,
-                    operacao: operacao,
-                    comentario: texto,
-                    codigo: item.codigo,
-                    cliente: item.cliente,
-                    descricao: item.descricao || null // 'descricao' não existe nos dados de teste, mas é enviado se existir
-                })
-            });
-            abrirAcoes(setor, ordem, sequencia, operacao);
+            await apiSalvarComentario(ordem, sequencia, operacao, texto, item);
+            abrirAcoes(setor, ordem, sequencia, operacao); // Recarrega o modal
         } catch (error) {
             alert(`Erro: ${error.message}`);
         }
@@ -512,20 +476,8 @@ document.addEventListener('DOMContentLoaded', () => {
     window.salvarInicioSeparacao = async (setor, ordem, sequencia, operacao) => {
         const codigoOperador = prompt('Código Focco do operador:');
         if (!codigoOperador || !codigoOperador.trim()) return;
-
         try {
-            await fetch('separacao_api.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    numero_ordem: ordem,
-                    sequencia: sequencia,
-                    operacao: operacao,
-                    setor: setor,
-                    acao: 'INICIO',
-                    colaborador_codigo_focco_operador: codigoOperador.trim()
-                })
-            });
+            await gerenciarSeparacao('INICIO', setor, ordem, sequencia, operacao, codigoOperador.trim());
             fecharModal();
             await carregarDados();
         } catch (error) {
@@ -535,11 +487,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.pausarSeparacao = async (setor, ordem, sequencia, operacao) => {
         try {
-            await fetch('separacao_api.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ numero_ordem: ordem, sequencia: sequencia, operacao: operacao, setor: setor, acao: 'PAUSA' })
-            });
+            await gerenciarSeparacao('PAUSA', setor, ordem, sequencia, operacao);
             fecharModal();
             await carregarDados();
         } catch (error) {
@@ -550,20 +498,8 @@ document.addEventListener('DOMContentLoaded', () => {
     window.retomarSeparacao = async (setor, ordem, sequencia, operacao) => {
         const codigoOperador = prompt('Código Focco do operador:');
         if (!codigoOperador || !codigoOperador.trim()) return;
-
         try {
-            await fetch('separacao_api.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    numero_ordem: ordem,
-                    sequencia: sequencia,
-                    operacao: operacao,
-                    setor: setor,
-                    acao: 'RETOMADA',
-                    colaborador_codigo_focco_operador: codigoOperador.trim()
-                })
-            });
+            await gerenciarSeparacao('RETOMADA', setor, ordem, sequencia, operacao, codigoOperador.trim());
             fecharModal();
             await carregarDados();
         } catch (error) {
@@ -574,17 +510,12 @@ document.addEventListener('DOMContentLoaded', () => {
     window.finalizarSeparacao = async (setor, ordem, sequencia, operacao) => {
         if (!confirm(`Finalizar separação da ordem ${ordem}?`)) return;
         try {
-            await fetch('separacao_api.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ numero_ordem: ordem, sequencia: sequencia, operacao: operacao, setor: setor, acao: 'FIM' })
-            });
+            await gerenciarSeparacao('FIM', setor, ordem, sequencia, operacao);
             if (confirm('Deseja mover para "Aguardando Produção"?')) {
-                await mudarStatus(setor, ordem, sequencia, operacao, 'producao');
-            } else {
-                fecharModal();
-                await carregarDados();
+                await apiMudarStatus(ordem, sequencia, operacao, setor, 'separacao', 'producao');
             }
+            fecharModal();
+            await carregarDados();
         } catch (error) {
             alert('Erro: ' + error.message);
         }
@@ -593,19 +524,8 @@ document.addEventListener('DOMContentLoaded', () => {
     window.salvarMudancaSetor = async (setorOrigem, ordem, sequencia, operacao) => {
         const setorDestino = document.getElementById('setor-destino').value;
         if (!setorDestino) return;
-
         try {
-            await fetch('movimentacao_api.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    numero_ordem: ordem,
-                    sequencia: sequencia,
-                    operacao: operacao,
-                    setor_origem: setorOrigem,
-                    setor_destino: setorDestino
-                })
-            });
+            await moverOrdemParaSetor(setorOrigem, ordem, sequencia, operacao, setorDestino);
             alert(`Ordem movida para ${setorDestino.toUpperCase()}!`);
             fecharModal();
             await carregarDados();
@@ -616,49 +536,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.abrirAcoes = async (setor, ordem, sequencia, operacao) => {
         const info = encontrarItemDetalhado(setor, ordem, sequencia, operacao);
-        console.log('setor, ordem, sequencia, operacao:', { setor, ordem, sequencia, operacao });
-        if (!info) { 
-            console.error("Item não encontrado:", { setor, ordem, sequencia, operacao }); 
+        if (!info || !info.item || !info.tipo) { 
+            console.error("Item não encontrado ou informações incompletas:", { setor, ordem, sequencia, operacao }, info); 
+            alert('Não foi possível carregar as ações: informações do item estão incompletas.');
             return; 
         }
         try {
             const { item, tipo } = info;
             // Buscar históricos antes de montar o modal
             // Função para salvar a nova data/hora da posição na fila
-            window.salvarPosicaoFila = async function(numero_ordem, sequencia, operacao) {
+            window.salvarPosicaoFila = async function(numero_ordem) {
                 const input = document.getElementById('input-posicao-fila');
-                if (!input) {
-                    alert('Campo de data/hora não encontrado.');
-                    return;
-                }
-                const novaData = input.value;
+                const novaData = input ? input.value : null;
                 if (!novaData) {
                     alert('Selecione uma data/hora válida.');
                     return;
                 }
-                // Converte para formato ISO completo
                 const dataISO = new Date(novaData).toISOString();
                 try {
-                    // PATCH precisa identificar a linha correta: use id ou chave composta
-                    const response = await fetch('console_ordens_api.php', {
-                        method: 'PATCH',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            numero_ordem,
-                            sequencia,
-                            operacao,
-                            posicao_fila: dataISO,
-                            // Se tiver id, envie também
-                            // id: idLinhaHistoricoStatus
-                        })
-                    });
-                    const result = await response.json();
-                    if (result.success && result.updated) {
+                    const result = await apiSalvarPosicaoFila(numero_ordem, dataISO);
+                    if (result.success) {
                         alert('Data/hora atualizada com sucesso!');
                         fecharModal();
-                        window.location.reload();
+                        await carregarDados(); 
                     } else {
                         alert('Erro ao atualizar data/hora: ' + (result.message || 'Erro desconhecido.'));
                     }
@@ -666,21 +566,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     alert('Erro ao salvar data/hora: ' + error);
                 }
             }
-            const [resComentarios, resMovimentacoes, resSeparacao, resStatus] = await Promise.all([
-                fetch('logs_producao_api.php?numero_ordem=' + item.numero_ordem).then(r => r.json()),
-                fetch('movimentacao_api.php?numero_ordem=' + item.numero_ordem).then(r => r.json()),
-                fetch('separacao_api.php?numero_ordem=' + item.numero_ordem + '&sequencia=' + item.sequencia).then(r => r.json()),
-                fetch('status_api.php?numero_ordem=' + item.numero_ordem).then(r => r.json())
-            ]);
 
-            item.comentarios = resComentarios.success ? resComentarios.data.map(c => ({ 
-                data: new Date(c.created_at).toLocaleString('pt-BR'),
-                colaborador: c.colaborador,
-                texto: c.comentario
-            })) : [];
-            item.historicoMovimentacoes = resMovimentacoes.success ? resMovimentacoes.data : [];
-            item.historicoSeparacao = resSeparacao.success ? resSeparacao.data : [];
-            item.historicoStatus = resStatus.success ? resStatus.data : [];
+            const historicos = await buscarHistoricos(item.numero_ordem, item.sequencia);
+            item.comentarios = historicos.comentarios;
+            item.historicoMovimentacoes = historicos.movimentacoes;
+            item.historicoSeparacao = historicos.separacao;
+            item.historicoStatus = historicos.status;
 
             const statusLabels = {
                 producao: 'Produção',
@@ -745,7 +636,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="form-group">
                     <label for="input-posicao-fila">Data/Hora na Fila</label>
                     <input type="datetime-local" id="input-posicao-fila" value="${posicaoFilaISO}">
-                    <button class="modal-action-btn" onclick="salvarPosicaoFila('${item.numero_ordem}', ${item.sequencia}, '${item.operacao}')">Salvar</button>
+                    <button class="modal-action-btn" onclick="salvarPosicaoFila('${item.numero_ordem}')">Salvar</button>
                     <span style="color:#888;font-size:0.95em;">Altere para subir/descer a ordem na fila.</span>
                 </div>
             `;
@@ -812,137 +703,9 @@ document.addEventListener('DOMContentLoaded', () => {
             abrirModal(`Ações - Ordem ${ordem}`, content);
         } catch (error) {
             console.error(`Erro ao buscar históricos para a ordem ${ordem}:`, error);
+            alert(`Erro ao carregar detalhes da ordem ${ordem}. Verifique o console para mais informações.`);
         }
-        
-        const statusLabels = {
-            producao: 'Produção',
-            separacao: 'Separação',
-            componentes: 'Componentes'
-        };
-
-        const setoresDisponiveis = Object.keys(dadosSetores)
-            .filter(s => s !== setor)
-            .map(s => `<option value="${s}">${s.toUpperCase()}</option>`)
-            .join('');
-        
-        const statusOptions = ['producao', 'separacao', 'componentes']
-            .map(s => `<option value="${s}" ${s === tipo ? 'selected' : ''}>${statusLabels[s]}</option>`)
-            .join('');
-
-        const historicoStatusHtml = item.historicoStatus.length
-            ? `<ul class="modal-list">${item.historicoStatus.map(h => {
-                const dataFormatada = new Date(h.data_movimentacao).toLocaleString('pt-BR');
-                const origem = h.status_anterior ? statusLabels[h.status_anterior] : 'Inicial';
-                const destino = statusLabels[h.status_novo] || h.status_novo;
-                return `<li>${dataFormatada}: ${origem} → ${destino} por <strong>${h.colaborador}</strong></li>`;
-            }).join('')}</ul>`
-            : '<p class="modal-muted">Sem histórico de status.</p>';
-
-        const historicoMovHtml = item.historicoMovimentacoes.length
-            ? `<ul class="modal-list">${item.historicoMovimentacoes.map(h => {
-                return `<li>${new Date(h.data_movimentacao).toLocaleString('pt-BR')}: ${h.setor_origem.toUpperCase()} → ${h.setor_destino.toUpperCase()} por <strong>${h.colaborador}</strong></li>`;
-            }).join('')}</ul>`
-            : '<p class="modal-muted">Sem movimentações registradas.</p>';
-
-        const historicoSeparacaoHtml = item.historicoSeparacao.length
-            ? `<ul class="modal-list">${item.historicoSeparacao.map(h => {
-                const dataFormatada = new Date(h.data_acao).toLocaleString('pt-BR');
-                return `<li>${dataFormatada}: Ação <strong>${h.acao}</strong> por Focco: <strong>${h.colaborador_codigo_focco}</strong></li>`;
-            }).join('')}</ul>`
-            : '<p class="modal-muted">Sem registros de separação.</p>';
-
-        const comentariosHtml = item.comentarios.length
-            ? `<ul class="modal-list">${item.comentarios.map(c => `<li>${formatarComentario(c)}</li>`).join('')}</ul>`
-            : '<p class="modal-muted">Nenhum comentário adicionado.</p>';
-        
-        let separacaoEstadoHtml = '';
-        let separacaoAcoesHtml = '';
-        
-        if (tipo !== 'separacao') {
-            separacaoEstadoHtml = '<p class="modal-muted">Mova para Separação para iniciar o processo.</p>';
-        } else {
-            // Lógica para determinar o estado atual da separação com base no histórico
-            const ultimoEvento = item.historicoSeparacao[0]; // O mais recente
-            if (!ultimoEvento || ultimoEvento.acao === 'FIM') {
-                separacaoEstadoHtml = '<p class="modal-muted">Separação não iniciada.</p>';
-                separacaoAcoesHtml = `<button class="modal-action-btn" onclick="salvarInicioSeparacao('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Iniciar separação</button>`;
-            } else if (ultimoEvento.acao === 'INICIO' || ultimoEvento.acao === 'RETOMADA') {
-                separacaoEstadoHtml = `<p><strong>Status:</strong> Em andamento por Focco: ${ultimoEvento.colaborador_codigo_focco}</p>`;
-                separacaoAcoesHtml = `
-                    <button class="modal-action-btn secondary" onclick="pausarSeparacao('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Pausar</button>
-                    <button class="modal-action-btn" onclick="finalizarSeparacao('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Finalizar</button>
-                `;
-            } else if (ultimoEvento.acao === 'PAUSA') {
-                separacaoEstadoHtml = `<p><strong>Status:</strong> Pausada por Focco: ${ultimoEvento.colaborador_codigo_focco}</p>`;
-                separacaoAcoesHtml = `
-                    <button class="modal-action-btn" onclick="retomarSeparacao('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Retomar</button>
-                    <button class="modal-action-btn" onclick="finalizarSeparacao('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Finalizar</button>
-                `;
-            }
-        }
-
-        const content = `
-            <div class="modal-summary">
-                <div><strong>Ordem:</strong> ${item.numero_ordem}</div>
-                <div><strong>Sequência:</strong> ${item.sequencia}</div>
-                <div><strong>Operação:</strong> ${item.operacao}</div>
-                <div><strong>Código:</strong> ${item.cod_item}</div>
-                <div><strong>Cliente:</strong> ${item.cliente}</div>
-                <div><strong>Quantidade:</strong> ${item.qtde}</div>
-            </div>
-
-            <div class="modal-section">
-                <h3>Separação</h3>
-                ${separacaoEstadoHtml}
-                <div class="modal-actions-row">
-                    ${separacaoAcoesHtml}
-                </div>
-                <div class="modal-subsection">
-                    <h4>Histórico de separação</h4>
-                    ${historicoSeparacaoHtml}
-                </div>
-            </div>
-
-            <div class="modal-section">
-                <h3>Comentários</h3>
-                ${comentariosHtml}
-                <div class="form-group">
-                    <label for="novo-comentario">Novo comentário</label>
-                    <textarea id="novo-comentario" rows="3" placeholder="Digite o comentário"></textarea>
-                </div>
-                <button class="modal-action-btn" onclick="salvarComentario('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Adicionar</button>
-            </div>
-
-            <div class="modal-section">
-                <h3>Movimentações</h3>
-                <div class="form-group">
-                    <label for="setor-destino">Mover para outro setor</label>
-                    <select id="setor-destino">${setoresDisponiveis}</select>
-                </div>
-                <button class="modal-action-btn" onclick="salvarMudancaSetor('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Mover ordem</button>
-                <div class="modal-subsection">
-                    <h4>Histórico de movimentações</h4>
-                    ${historicoMovHtml}
-                </div>
-            </div>
-
-            <div class="modal-section">
-                <h3>Status</h3>
-                <div class="form-group">
-                    <label for="status-select">Atualizar status</label>
-                    <select id="status-select">${statusOptions}</select>
-                </div>
-                <button class="modal-action-btn" onclick="confirmarMudancaStatus('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Atualizar status</button>
-                <div class="modal-subsection">
-                    <h4>Linha do tempo</h4>
-                    ${historicoStatusHtml}
-                </div>
-            </div>
-        `;
-
-        abrirModal(`Ações - Ordem ${ordem}`, content);
-    };
-
+    }; // <--- FIM DA FUNÇÃO "abrirAcoes"
     // --- ATUALIZAÇÃO DA INTERFACE ---
     // ========== FUNÇÕES AUXILIARES PARA ROTEAMENTO INTELIGENTE ==========
     
@@ -999,66 +762,44 @@ document.addEventListener('DOMContentLoaded', () => {
      * Enriquece dados de ordens em separação com informações de colaborador e status
      */
     async function enriquecerDadosSeparacao() {
+        // Encontra todas as ordens em separação em todos os setores
+        let todasOrdensSeparacao = [];
+        Object.values(dadosSetores).forEach(setor => {
+            todasOrdensSeparacao.push(...setor.separacao.dados);
+        });
+
+        if (todasOrdensSeparacao.length === 0) return;
+
         try {
-            // Buscar mapa de usuários
-            const resUsuarios = await fetch('usuarios_api.php');
-            const RUsuarios = await resUsuarios.json();
-            const mapaUsuarios = RUsuarios.success
-                ? new Map(RUsuarios.data.map(u => [u.codigo_focco, u.nome_completo]))
-                : new Map();
+            const { mapaUsuarios, resultadosHistoricos } = await buscarDadosSeparacao(todasOrdensSeparacao);
 
-            for (const setor of Object.keys(dadosSetores)) {
-                if (setor === 'sem-setor-cadastrado') continue;
-                const ordensEmSeparacao = dadosSetores[setor]['separacao'].dados;
-                if (ordensEmSeparacao.length === 0) continue;
+            todasOrdensSeparacao.forEach((ordem) => {
+                const historicoResult = resultadosHistoricos.find(h => h.numero_ordem === ordem.numero_ordem);
+                
+                if (!historicoResult || !historicoResult.success || !historicoResult.data || historicoResult.data.length === 0) {
+                    return;
+                }
 
-                // Garante que os campos estejam corretos
-                const promises = ordensEmSeparacao.map(ordem => {
-                    const numero_ordem = ordem.numero_ordem || ordem.ordem;
-                    const sequencia = ordem.sequencia;
-                    const params = new URLSearchParams({
-                        numero_ordem: numero_ordem,
-                        sequencia: sequencia
-                    });
-                    return fetch(`separacao_api.php?${params.toString()}`)
-                        .then(res => res.json())
-                        .catch(e => ({ success: false, error: e }));
-                });
+                const historico = historicoResult.data;
+                const ultimoEvento = historico[0];
+                if (ultimoEvento.acao === 'FIM') return;
+                
+                const ultimoFim = historico.find(e => e.acao === 'FIM');
+                const dataUltimoFim = ultimoFim ? new Date(ultimoFim.data_acao).getTime() : 0;
+                const eventoDeInicio = historico.find(e => e.acao === 'INICIO' && new Date(e.data_acao).getTime() > dataUltimoFim);
 
-                const resultadosHistoricos = await Promise.all(promises);
+                const statusMapeado = { 'INICIO': 'iniciada', 'RETOMADA': 'iniciada', 'PAUSA': 'pausada' };
+                const nomeColaborador = mapaUsuarios.get(ultimoEvento.colaborador_codigo_focco) || ultimoEvento.colaborador_codigo_focco;
 
-                ordensEmSeparacao.forEach((ordem, index) => {
-                    const numero_ordem = ordem.numero_ordem || ordem.ordem;
-                    const sequencia = ordem.sequencia;
-                    const historicoResult = resultadosHistoricos[index];
-                    if (!historicoResult.success || !historicoResult.data || historicoResult.data.length === 0) {
-                        return;
-                    }
+                ordem.separacaoInfo = {
+                    status: statusMapeado[ultimoEvento.acao],
+                    colaborador: nomeColaborador,
+                    dataInicio: eventoDeInicio ? new Date(eventoDeInicio.data_acao).toLocaleString('pt-BR') : 'N/A',
+                };
+            });
 
-                    const historico = historicoResult.data;
-                    const ultimoEvento = historico[0];
-
-                    if (ultimoEvento.acao === 'FIM') {
-                        return;
-                    }
-
-                    const ultimoFim = historico.find(e => e.acao === 'FIM');
-                    const dataUltimoFim = ultimoFim ? new Date(ultimoFim.data_acao).getTime() : 0;
-                    const eventoDeInicio = historico.find(e => e.acao === 'INICIO' && new Date(e.data_acao).getTime() > dataUltimoFim);
-
-                    const statusMapeado = { 'INICIO': 'iniciada', 'RETOMADA': 'iniciada', 'PAUSA': 'pausada' };
-                    const nomeColaborador = mapaUsuarios.get(ultimoEvento.colaborador_codigo_focco) || ultimoEvento.colaborador_codigo_focco;
-
-                    ordem.separacaoInfo = {
-                        status: statusMapeado[ultimoEvento.acao],
-                        colaborador: nomeColaborador,
-                        dataInicio: eventoDeInicio ? new Date(eventoDeInicio.data_acao).toLocaleString('pt-BR') : 'N/A',
-                        debugHistorico: historico
-                    };
-                });
-            }
         } catch (error) {
-            // Erro silencioso
+            console.error("Erro ao enriquecer dados de separação:", error);
         }
     }
     
@@ -1108,6 +849,23 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const dadosDoTipo = dados[tipo].dados;
 
+            // Ordena os dados pela data/hora da posição na fila (mais antigo primeiro)
+            dadosDoTipo.sort((a, b) => {
+                const dataA = a.posicao_fila ? new Date(a.posicao_fila).getTime() : Infinity;
+                const dataB = b.posicao_fila ? new Date(b.posicao_fila).getTime() : Infinity;
+                
+                // Trata datas inválidas colocando-as no final
+                const aValida = !isNaN(dataA);
+                const bValida = !isNaN(dataB);
+
+                if (aValida && bValida) {
+                    return dataA - dataB;
+                }
+                if (aValida) return -1; // Só A é válido, então A vem primeiro
+                if (bValida) return 1;  // Só B é válido, então B vem primeiro
+                return 0; // Nenhum é válido, mantém a ordem
+            });
+
             tbody.innerHTML = dadosDoTipo.map(item => {
                 garantirStatusInicial(item, tipo);
                 let rowClass = '';
@@ -1127,19 +885,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Usa posicao_fila (timestampz) para a data, formatando para pt-BR
                 let dataFila = '';
                 if (item.posicao_fila) {
+                    
                     try {
                         const dt = new Date(item.posicao_fila);
+                        
                         if (!isNaN(dt.getTime())) {
                             dataFila = dt.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-                            } else {
+                        
+                        } else {
                             dataFila = item.posicao_fila;
-                            
+                            console.warn('[DATA DEBUG] Date inválido, usando valor bruto:', dataFila);
                         }
                     } catch (e) {
                         dataFila = item.posicao_fila;
-                        }
+                        console.error('[DATA DEBUG] Erro ao converter data:', e, 'usando valor bruto:', dataFila);
+                    }
                 } else {
-                     }
+                    console.warn('[DATA DEBUG] posicao_fila não existe para item:', item);
+                }
                 return `
                     <tr class="${rowClass}" data-ordem="${item.numero_ordem}" data-sequencia="${item.sequencia}" data-operacao="${item.operacao}">
                         <td>${dataFila}${infoExtraHtml}</td>
@@ -1160,101 +923,58 @@ document.addEventListener('DOMContentLoaded', () => {
 // ========== MODAL DE DEMANDAS ==========
 window.abrirDemandas = async function(numero_ordem, sequencia) {
     abrirModal('Demandas da Ordem', '<div style="padding:20px;text-align:center;">Carregando demandas...</div>');
-    // Função para buscar endereço do Supabase
-    async function buscarEnderecoSupabase(codigo_item) {
-        const SUPABASE_URL = "https://ysvqatplclssljhicfkw.supabase.co";
-        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlzdnFhdHBsY2xzc2xqaGljZmt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MDM3OTEsImV4cCI6MjA4NTk3OTc5MX0.EMBnO1YB2iJbbtK3RSGiTu-o9njryiJ4SYeYikVg6f8";
-        try {
-            const response = await fetch(`${SUPABASE_URL}/rest/v1/estoque?codigo_item=eq.${encodeURIComponent(codigo_item)}`, {
-                headers: {
-                    apikey: SUPABASE_KEY,
-                    Authorization: `Bearer ${SUPABASE_KEY}`,
-                    "Content-Type": "application/json"
-                }
-            });
-            const data = await response.json();
-            if (data.length > 0) {
-                const { estante, prateleira, posicao } = data[0];
-                return `Estante: <b>${estante}</b><br>Prateleira: <b>${prateleira}</b><br>Posição: <b>${posicao}</b>`;
-            } else {
-                return '<span style="color:#888">Endereço não cadastrado</span>';
-            }
-        } catch (e) {
-            return '<span style="color:#e74c3c">Erro ao buscar endereço</span>';
-        }
-    }
+    
     try {
-        const response = await fetch(`Requisicao/buscar_demandas.php?num_ordem=${numero_ordem}&cod_emp=1`);
-        const result = await response.json();
-        if (!result.success) {
-            abrirModal('Demandas da Ordem', `<div style="color:red;padding:20px;">Erro ao buscar demandas: ${result.error || 'Erro desconhecido'}</div>`);
-            return;
-        }
+        const demandasData = await buscarDemandas(numero_ordem);
+        
         // Agrupar por sequência de operação
         const demandasPorSeq = {};
-        result.data.forEach(demanda => {
+        demandasData.forEach(demanda => {
             const seq = demanda.SEQ_DEMANDA || demanda.SEQ_OPERACAO || demanda.seq_operacao || 'Sem Seq';
             if (!demandasPorSeq[seq]) demandasPorSeq[seq] = { demandas: [], desc_operacao: demanda.DESC_OPERACAO || demanda.desc_operacao || '' };
             demandasPorSeq[seq].demandas.push(demanda);
         });
+
         let html = '';
-        // Extrair código do produto, descrição, data e cliente da primeira demanda (se houver)
         let cod_produto = '', descricao = '', data = '', cliente = '', quantidade = '';
-        const primeiraDemanda = result.data && result.data.length > 0 ? result.data[0] : null;
-        if (primeiraDemanda) {
+        if (demandasData.length > 0) {
+            const primeiraDemanda = demandasData[0];
             cod_produto = primeiraDemanda.COD_ITEM || primeiraDemanda.cod_item || '';
             descricao = primeiraDemanda.DESC_TECNICA || primeiraDemanda.desc_tecnica || '';
         }
-        // Buscar data e cliente da ordem correspondente em dadosSetores
-        const ordemInfo = (() => {
-            for (const setor of Object.values(dadosSetores)) {
-                for (const tipo of ['producao', 'separacao', 'componentes']) {
-                    const ordem = setor[tipo].dados.find(o => String(o.ordem) === String(numero_ordem) || String(o.numero_ordem) === String(numero_ordem));
-                    if (ordem) return ordem;
-                }
-            }
-            return null;
-        })();
+
+        const ordemInfo = encontrarItemEmTodosOsSetores(numero_ordem);
+
         if (ordemInfo) {
-           
-            // Usa posicao_fila (timestampz) para a data
             if (ordemInfo.posicao_fila) {
                 try {
                     const dt = new Date(ordemInfo.posicao_fila);
-                    if (!isNaN(dt.getTime())) {
-                        data = dt.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-                    } else {
-                        data = ordemInfo.posicao_fila;
-                    }
-                } catch (e) {
-                    data = ordemInfo.posicao_fila;
-                }
+                    data = !isNaN(dt.getTime()) ? dt.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : ordemInfo.posicao_fila;
+                } catch (e) { data = ordemInfo.posicao_fila; }
             } else {
                 data = ordemInfo.data || ordemInfo.dt_entrega || '';
             }
             cliente = ordemInfo.cliente || '';
-            quantidade = ordemInfo.qnt || ordemInfo.qtde || ordemInfo.Qnt || ordemInfo.QTDE || ordemInfo.quantidade || '';
-           
-        } else {
-           
+            quantidade = ordemInfo.qnt || ordemInfo.qtde || '';
         }
-        if (typeof quantidade === 'undefined') quantidade = '';
-        // Botão de imprimir e campo para código focco do requisitante
-        html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:16px;">
-            <button class="modal-action-btn" onclick="window.imprimirDemandasModal('${numero_ordem}', document.getElementById('modal-body').innerHTML, '${cod_produto}', '${descricao}', '${data}', '${cliente}', '${quantidade}')">🖨️ Imprimir</button>
-            <div style="display:flex;align-items:center;gap:16px;">
-                <label for="codigo-focco-requisitante" style="font-weight:bold;">Código Focco do requisitante:</label>
-                <input id="codigo-focco-requisitante" type="text" style="padding:6px 12px;font-size:1em;border-radius:6px;border:1px solid #ccc;width:180px;" placeholder="(opcional)" />
-                <span style="color:#888;font-size:0.95em;">Se vazio, será usado o código do usuário logado.</span>
-            </div>
-        </div>`;
+
+        html += `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:16px;">
+                <button class="modal-action-btn" onclick="window.imprimirDemandasModal('${numero_ordem}', document.getElementById('modal-body').innerHTML, '${cod_produto}', '${descricao}', '${data}', '${cliente}', '${quantidade}')">🖨️ Imprimir</button>
+                <div style="display:flex;align-items:center;gap:16px;">
+                    <label for="codigo-focco-requisitante" style="font-weight:bold;">Código Focco do requisitante:</label>
+                    <input id="codigo-focco-requisitante" type="text" style="padding:6px 12px;font-size:1em;border-radius:6px;border:1px solid #ccc;width:180px;" placeholder="(opcional)" />
+                    <span style="color:#888;font-size:0.95em;">Se vazio, será usado o código do usuário logado.</span>
+                </div>
+            </div>`;
+
         // Buscar endereços de todos os itens de demanda
         for (const seq of Object.keys(demandasPorSeq).sort((a,b)=>parseInt(a)-parseInt(b))) {
             const grupo = demandasPorSeq[seq];
             html += `
                 <div style="margin:18px 0 6px 0;display:flex;align-items:center;gap:16px;">
                     <span style="font-weight:bold;font-size:1.1em;">Sequência de Operação: ${seq} - ${grupo.desc_operacao}</span>
-                    <button class="modal-action-btn" style="padding:6px 14px;font-size:0.95em;" onclick="window.requisitarDemandas(${numero_ordem}, ${seq})">Requisitar todas demandas desta sequência</button>
+                    <button class="modal-action-btn" style="padding:6px 14px;font-size:0.95em;" onclick="window.requisitarDemandas('${numero_ordem}', ${seq})">Requisitar todas demandas desta sequência</button>
                 </div>
                 <div style="overflow-x:auto;">
                 <table class="dados-table demandas-table" style="width:98vw;max-width:1200px;margin-bottom:10px;border-spacing:0 6px;">
@@ -1295,91 +1015,44 @@ window.abrirDemandas = async function(numero_ordem, sequencia) {
                     </tr>
                 `;
             }
-            html += `</tbody></table></div>`;
+             html += `</tbody></table></div>`;
         }
+
         // Requisitar demanda linha a linha
-        window.requisitarDemandaLinha = async function(numero_ordem, seq, cod_item, qtde_pendente, seq_demanda) {
+        window.requisitarDemandaLinha = async function(numero_ordem, seq, cod_item, qtde_pendente) {
             if (parseFloat(qtde_pendente) === 0) {
                 alert('Demanda já requisitada!');
                 return;
             }
-            // Log detalhado dos dados coletados e enviados
             const codFoccoInput = document.getElementById('codigo-focco-requisitante');
-            const codFocco = codFoccoInput && codFoccoInput.value ? codFoccoInput.value : (sessionStorage.getItem('codigo_focco') || '');
-            const dadosColetados = {
-                numero_ordem_coletado: numero_ordem,
-                seq_coletado: seq,
-                cod_item_coletado: cod_item,
-                qtde_pendente_coletado: qtde_pendente,
-                cod_focco_coletado: codFocco,
-                seq_demanda_coletado: seq_demanda
-            };
-            const dadosPost = {
-                cod_emp: 1,
-                num_ordem: numero_ordem,
-                cod_item: (cod_item || '').trim().toUpperCase(),
-                qtde: qtde_pendente,
-                cod_func: codFocco,
-                codigo_focco: codFocco
-                // seq_demanda removido
-            };
-            const formData = new FormData();
-            formData.append('cod_emp', 1);
-            formData.append('num_ordem', numero_ordem);
-            formData.append('cod_item', (cod_item || '').trim().toUpperCase());
-            formData.append('qtde', qtde_pendente);
-            formData.append('cod_func', codFocco);
-            formData.append('codigo_focco', codFocco);
-            // seq_demanda removido
-            // ...existing code...
-            const resp = await fetch('Requisicao/index.php', { method: 'POST', body: formData });
-            const res = await resp.json();
-            if (!res.success) {
-                alert('Erro ao requisitar item ' + cod_item + ': ' + (res.message || 'Erro desconhecido'));
-            } else {
+            const codFocco = codFoccoInput?.value || sessionStorage.getItem('codigo_focco') || '';
+            
+            try {
+                await requisitarDemanda(numero_ordem, cod_item, qtde_pendente, codFocco);
                 alert('Demanda requisitada com sucesso!');
-                window.abrirDemandas(numero_ordem, seq);
+                window.abrirDemandas(numero_ordem, seq); // Recarrega o modal
+            } catch (error) {
+                alert('Erro ao requisitar item ' + cod_item + ': ' + error.message);
             }
         };
+
         abrirModal(`Demandas da Ordem ${numero_ordem}`, html);
     } catch (error) {
-        abrirModal('Demandas da Ordem', `<div style=\"color:red;padding:20px;\">Erro ao buscar demandas: ${error.message}</div>`);
+//...
+        abrirModal('Demandas da Ordem', `<div style="color:red;padding:20px;">Erro ao buscar demandas: ${error.message}</div>`);
     }
 };
 
 window.requisitarDemandas = async function(numero_ordem, sequencia) {
-    const response = await fetch(`Requisicao/buscar_demandas.php?num_ordem=${numero_ordem}&cod_emp=1`);
-    const result = await response.json();
-    if (!result.success) {
-        alert('Erro ao buscar demandas: ' + (result.error || 'Erro desconhecido'));
-        return;
-    }
-    const demandasSeq = result.data.filter(d => parseInt(d.SEQ_DEMANDA) === parseInt(sequencia));
-    if (demandasSeq.length === 0) {
-        alert('Nenhuma demanda encontrada para esta sequência.');
-        return;
-    }
     const codFoccoInput = document.getElementById('codigo-focco-requisitante');
-    const codFocco = codFoccoInput && codFoccoInput.value ? codFoccoInput.value : (sessionStorage.getItem('codigo_focco') || '');
-    for (const demanda of demandasSeq) {
-        if (parseFloat(demanda.QTDE_PENDENTE) > 0) {
-            const formData = new FormData();
-            formData.append('cod_emp', 1);
-            formData.append('num_ordem', numero_ordem);
-            formData.append('cod_item', demanda.COD_ITEM);
-            formData.append('qtde', demanda.QTDE_PENDENTE);
-            formData.append('cod_func', codFocco);
-            formData.append('codigo_focco', codFocco);
-            formData.append('seq_demanda', demanda.SEQ_DEMANDA);
-            const resp = await fetch('Requisicao/index.php', { method: 'POST', body: formData });
-            const res = await resp.json();
-            if (!res.success) {
-                alert('Erro ao requisitar item ' + demanda.COD_ITEM + ': ' + (res.message || 'Erro desconhecido'));
-            }
-        }
+    const codFocco = codFoccoInput?.value || sessionStorage.getItem('codigo_focco') || '';
+    try {
+        await requisitarDemandasDaSequencia(numero_ordem, sequencia, codFocco);
+        alert('Requisição de demandas enviada!');
+        window.abrirDemandas(numero_ordem, sequencia);
+    } catch (error) {
+        alert('Erro ao requisitar demandas: ' + error.message);
     }
-    alert('Requisição de demandas enviada!');
-    window.abrirDemandas(numero_ordem, sequencia);
 };
 
         renderTabela('producao', '#tab-producao tbody');
@@ -1430,7 +1103,7 @@ window.requisitarDemandas = async function(numero_ordem, sequencia) {
                 const result = await fetchFn(item);
                 processed++;
                 const percent = Math.round((processed / items.length) * 100);
-               
+                console.log(`⏳ Progresso: ${processed}/${items.length} (${percent}%)`);
                 return { item, result, originalIdx: i + idx };
             }));
             
@@ -1445,104 +1118,58 @@ window.requisitarDemandas = async function(numero_ordem, sequencia) {
     /**
      * Carrega dados com Roteamento Inteligente, priorizando movimentações manuais.
      */
-    async function carregarDados() {
-        console.log('🔄 Carregando dados com Roteamento Inteligente...');
-        try {
-            // 1. Limpar todos os dados existentes
-            Object.keys(dadosSetores).forEach(setor => {
-                Object.keys(dadosSetores[setor]).forEach(tipo => {
-                    dadosSetores[setor][tipo].dados = [];
-                    dadosSetores[setor][tipo].total = 0;
-                });
-            });
+async function carregarDados() {
+    console.log('🔄 Carregando dados com Roteamento Inteligente...');
+    try {
+        // 1. Limpar dados existentes
+        Object.values(dadosSetores).forEach(setor => Object.values(setor).forEach(tipo => {
+            tipo.dados = [];
+            tipo.total = 0;
+        }));
 
-            // 2. Buscar as duas fontes de ordens
-            const resComponentes = await fetch('console_ordens_api.php');
-            const resultComponentes = await resComponentes.json();
-            const ordensComponentes = (resultComponentes.success && resultComponentes.data) ? resultComponentes.data : [];
+        // 2. Buscar todas as fontes de dados em paralelo
+        const { ordensComponentes, ordensEmProcesso, mapaMovimentacoes } = await carregarDadosIniciais();
 
-            const resHistorico = await fetch('status_api.php?setor=all');
-            const resultHistorico = await resHistorico.json();
-            const ordensEmProcesso = (resultHistorico.success && resultHistorico.data) ? resultHistorico.data : [];
+        const todasAsOrdens = [...ordensComponentes, ...ordensEmProcesso];
+        
+        const statusMap = new Map();
+        ordensEmProcesso.forEach(s => {
+            const chave = `${s.numero_ordem}-${s.sequencia}-${s.operacao}`;
+            statusMap.set(chave, s.status_novo);
+        });
 
-            // Como a view 'ordens_pendentes' já exclui o que está no histórico, podemos simplesmente juntar as listas.
-            const todasAsOrdens = [...ordensComponentes, ...ordensEmProcesso];
+        // 3. Roteamento
+        todasAsOrdens.forEach(ordem => {
+            const chave = `${ordem.numero_ordem}-${ordem.sequencia}-${ordem.operacao}`;
+            const statusAtual = statusMap.get(chave) || 'componentes';
+            const setorMovidoManualmente = mapaMovimentacoes.get(chave);
+            let setorDestino = setorMovidoManualmente || ordem.setor?.toLowerCase().trim() || 'setor não cadastrado';
 
-            // 3. Buscar o histórico de movimentações manuais (a fonte da verdade para o setor)
-            const resMovimentacoes = await fetch('movimentacao_api.php?all=1');
-            const resultMovimentacoes = await resMovimentacoes.json();
-            const mapaMovimentacoes = new Map();
-            if (resultMovimentacoes.success && resultMovimentacoes.data) {
-                // A API retorna ordenado pela data mais recente, então o primeiro que encontrarmos para uma chave é o último.
-                resultMovimentacoes.data.forEach(m => {
-                    const chave = `${m.numero_ordem}-${m.sequencia}-${m.operacao}`;
-                    if (!mapaMovimentacoes.has(chave)) {
-                        mapaMovimentacoes.set(chave, m.setor_destino.toLowerCase().trim());
-                    }
-                });
+            if (!dadosSetores[setorDestino]) {
+                dadosSetores[setorDestino] = {
+                    producao: { total: 0, dados: [] },
+                    separacao: { total: 0, dados: [] },
+                    componentes: { total: 0, dados: [] }
+                };
             }
+            dadosSetores[setorDestino][statusAtual].dados.push(addExtraFields(ordem));
+        });
 
-            // 4. Criar um mapa de status para as ordens que já estão em produção/separação
-            const statusMap = new Map();
-            ordensEmProcesso.forEach(s => {
-                const chave = `${s.numero_ordem}-${s.sequencia}-${s.operacao}`;
-                statusMap.set(chave, s.status_novo);
-            });
+        // 4. Recalcular totais
+        Object.values(dadosSetores).forEach(setor => Object.values(setor).forEach(tipo => {
+            tipo.total = tipo.dados.length;
+        }));
 
-            // 5. Roteamento: processar cada ordem para decidir seu setor e status final
-            todasAsOrdens.forEach(ordem => {
-                const chave = `${ordem.numero_ordem}-${ordem.sequencia}-${ordem.operacao}`;
+        await garantirSetorSemCadastroUI();
+        await enriquecerDadosSeparacao(); // Agora enriquecemos os dados já roteados
+        
+        const setorAtivo = document.querySelector('.menu-item.active')?.getAttribute('data-menu') || 'mt1';
+        atualizarDados(setorAtivo); // Renderiza a UI
 
-                // Etapa A: Determinar o STATUS FINAL
-                // Se a ordem estiver no mapa de status, ela está em 'producao' ou 'separacao'. Senão, 'componentes'.
-                const statusAtual = statusMap.get(chave) || 'componentes';
-
-                // Etapa B: Determinar o SETOR FINAL
-                let setorDestino;
-                // Prioridade 1: Verificar se houve uma movimentação manual para esta ordem.
-                const setorMovidoManualmente = mapaMovimentacoes.get(chave);
-                if (setorMovidoManualmente) {
-                    setorDestino = setorMovidoManualmente;
-                } else {
-                    // Prioridade 2: Usar o setor original que veio da API.
-                    setorDestino = ordem.setor ? ordem.setor.toLowerCase().trim() : null;
-                }
-
-                // Fallback: Se, por algum motivo, não houver setor, vai para 'sem cadastro'.
-                if (!setorDestino) {
-                    setorDestino = 'setor não cadastrado';
-                }
-
-                // Garantir que a estrutura do setor exista antes de adicionar dados
-                if (!dadosSetores[setorDestino]) {
-                    dadosSetores[setorDestino] = {
-                        producao: { total: 0, dados: [] },
-                        separacao: { total: 0, dados: [] },
-                        componentes: { total: 0, dados: [] }
-                    };
-                }
-
-                // Etapa C: Adicionar a ordem na lista correta
-                dadosSetores[setorDestino][statusAtual].dados.push(addExtraFields(ordem));
-            });
-
-            // 6. Recalcular os totais e atualizar a interface
-            Object.keys(dadosSetores).forEach(setor => {
-                Object.keys(dadosSetores[setor]).forEach(tipo => {
-                    dadosSetores[setor][tipo].total = dadosSetores[setor][tipo].dados.length;
-                });
-            });
-
-            await garantirSetorSemCadastroUI();
-            atualizarTodosOsContadores();
-            const setorAtivo = document.querySelector('.menu-item.active')?.getAttribute('data-menu') || 'mt1';
-            atualizarDados(setorAtivo);
-
-            console.log('✅ Dados carregados com Roteamento Inteligente.');
-        } catch (error) {
-            console.error('❌ Erro ao carregar dados com roteamento:', error);
-        }
+    } catch (error) {
+        console.error('❌ Erro ao carregar dados com roteamento:', error);
     }
+}
 
     // Inicialização
     console.log('⏳ Inicialização...');
@@ -1563,11 +1190,8 @@ window.requisitarDemandas = async function(numero_ordem, sequencia) {
     setInterval(async () => {
         console.log('🔄 Sincronização automática com Focco (intervalo de 15 min)');
         try {
-            await sincronizarComFocco();
+            await apiSincronizarComFocco();
             await carregarDados();
-            await enriquecerDadosSeparacao();
-            const setorAtivo = document.querySelector('.menu-item.active')?.getAttribute('data-menu') || 'mt1';
-            atualizarDados(setorAtivo);
         } catch (error) {
             console.error('❌ Erro na sincronização automática:', error);
         }

@@ -200,3 +200,35 @@ Resultado procedure: Array
     [error] => 
 )
 
+POST recebido: Array
+(
+    [cod_emp] => 1
+    [num_ordem] => 18941609
+    [cod_item] => SKBSES001-B
+    [qtde] => 1
+    [cod_func] => 001009
+    [codigo_focco] => 001009
+)
+
+Resultado procedure: Array
+(
+    [success] => 1
+    [error] => 
+)
+
+POST recebido: Array
+(
+    [cod_emp] => 1
+    [num_ordem] => 19073501
+    [cod_item] => 7677
+    [qtde] => 133.6
+    [cod_func] => 001009
+    [codigo_focco] => 001009
+)
+
+Resultado procedure: Array
+(
+    [success] => 1
+    [error] => 
+)
+

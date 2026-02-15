@@ -57,6 +57,25 @@ try {
         $response['data'] = $supabase->insert('historico_status', $data);
         $response['success'] = true;
         $response['message'] = 'Status atualizado com sucesso.';
+    
+    } 
+    // PATCH: Atualiza a data/hora da posição na fila para todas as entradas de uma ordem
+    elseif ($_SERVER['REQUEST_METHOD'] === 'PATCH') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $numero_ordem = $input['numero_ordem'] ?? null;
+        $posicao_fila = $input['posicao_fila'] ?? null;
+
+        if (empty($numero_ordem) || empty($posicao_fila)) {
+            throw new Exception('Número da ordem e nova data/hora são obrigatórios.');
+        }
+
+        $updateData = ['posicao_fila' => $posicao_fila];
+        $where = "numero_ordem=eq.{$numero_ordem}";
+        
+        $response['data'] = $supabase->update('historico_status', $updateData, $where);
+        $response['success'] = true;
+        $response['message'] = 'Posição na fila atualizada para todas as entradas da ordem.';
+
     } else {
         throw new Exception('Método não permitido.');
     }
