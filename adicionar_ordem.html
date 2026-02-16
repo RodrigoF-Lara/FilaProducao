@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Adicionar Ordem Manualmente</title>
+    <link rel="stylesheet" href="styles.css">
+    <script type="module" src="adicionar_ordem.js"></script>
+    <style>
+        .btn-grande-adicionar {
+            background: #1976d2;
+            color: #fff;
+            font-size: 1.6em;
+            padding: 32px 48px;
+            border: none;
+            border-radius: 16px;
+            margin: 60px auto 0 auto;
+            display: block;
+            cursor: pointer;
+            box-shadow: 0 4px 16px #0001;
+            transition: background 0.2s;
+        }
+        .btn-grande-adicionar:hover {
+            background: #125ea7;
+        }
+    </style>
+</head>
+<body>
+    <button class="btn-grande-adicionar" id="btn-grande-adicionar-ordem">+ Adicionar Ordem Manualmente</button>
+    <script type="module">
+        import { abrirModalAdicionarOrdem } from './adicionar_ordem.js';
+        document.getElementById('btn-grande-adicionar-ordem').onclick = abrirModalAdicionarOrdem;
+    </script>
+</body>
+</html>

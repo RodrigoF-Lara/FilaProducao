@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cofelma - Gestão PPCP</title>
     <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
   </head>
   <body>
     <div class="container">
@@ -27,7 +28,8 @@
           <span id="user-info"></span>
           <a href="usuarios.html" id="users-btn" class="users-btn">Usuários</a>
           <button id="logout-btn" class="logout-btn">Sair</button>
-            <button id="btn-sincronizar-finalizacao" style="margin-right:16px;">Sincronizar Finalização</button>
+          <button id="btn-adicionar-ordem-manual" style="background:#1976d2;color:#fff;font-size:1.1em;padding:12px 32px;border:none;border-radius:8px;cursor:pointer;margin-right:16px;">+ Adicionar Ordem Manualmente</button>
+          <button id="btn-sincronizar-finalizacao" style="margin-right:16px;">Sincronizar Finalização</button>
         </div>
       </header>
 
@@ -316,8 +318,20 @@
     </div>
 
     <script src="modalAcao.js?v=20260206-1670"></script>
+    <script type="module" src="adicionar_ordem.js"></script>
     <script type="module" src="script.js?v=20260206-1670"></script>
-      <script>
+    <script type="module">
+      // Importa dinamicamente a função e define no window
+      import { abrirModalAdicionarOrdem } from './adicionar_ordem.js';
+      window.abrirModalAdicionarOrdem = abrirModalAdicionarOrdem;
+
+      document.getElementById('btn-adicionar-ordem-manual').onclick = function() {
+        if (window.abrirModalAdicionarOrdem) {
+          window.abrirModalAdicionarOrdem();
+        } else {
+          alert('Função de adicionar ordem manual não encontrada.');
+        }
+      };
       document.getElementById('btn-sincronizar-finalizacao').onclick = async function() {
         const btn = this;
         btn.disabled = true;
@@ -335,6 +349,7 @@
             return;
           }
           alert(res.message || 'Sincronização concluída!');
+          await carregarDados();
         } catch (e) {
           alert('Erro ao sincronizar: ' + e.message);
         }
@@ -356,8 +371,8 @@
             // erro silencioso
           });
       }, 5 * 60 * 1000);
-      </script>
-      <script src="impressao.js?v=1"></script>
-      <!-- Removido script.js duplicado -->
+    </script>
+    <script src="impressao.js?v=1"></script>
+    <!-- Removido script.js duplicado -->
   </body>
 </html>

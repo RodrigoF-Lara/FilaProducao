@@ -43,7 +43,7 @@ export async function fazerLogout() {
 /**
  * Atualiza o status de uma ordem (producao, separacao, componentes).
  */
-export async function mudarStatus(ordem, sequencia, operacao, setor, tipoAtual, novoStatus) {
+export async function mudarStatus(ordem, sequencia, operacao, setor, tipoAtual, novoStatus, posicaoFila = null) {
     const operacaoTrunc = operacao && operacao.length > 100 ? operacao.substring(0, 100) : operacao;
     const payload = {
         numero_ordem: ordem,
@@ -51,7 +51,8 @@ export async function mudarStatus(ordem, sequencia, operacao, setor, tipoAtual, 
         operacao: operacaoTrunc,
         setor: setor,
         status_anterior: tipoAtual,
-        status_novo: novoStatus
+        status_novo: novoStatus,
+        posicao_fila: posicaoFila || new Date().toISOString()
     };
 
     const resp = await fetch('status_api.php', {
@@ -167,15 +168,14 @@ export async function buscarHistoricos(numero_ordem, sequencia) {
 }
 
 /**
- * Salva a nova data/hora da posição na fila para uma ordem.
- * ATENÇÃO: Isso atualiza TODAS as linhas da ordem.
+ * Salva a nova data/hora da posição na fila para uma linha específica.
  */
-export async function salvarPosicaoFila(numero_ordem, novaDataISO) {
+export async function salvarPosicaoFila(id, novaDataISO) {
     const resp = await fetch('status_api.php', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            numero_ordem,
+            id: id,
             posicao_fila: novaDataISO,
         })
     });

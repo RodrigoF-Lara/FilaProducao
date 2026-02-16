@@ -155,12 +155,12 @@ document.addEventListener('DOMContentLoaded', () => {
             ['producao', 'separacao', 'componentes'].forEach(tipo => {
                 if (setore[tipo] && setore[tipo].dados) {
                     setore[tipo].dados.forEach(item => {
-                        if (String(item.ordem).toLowerCase().includes(numeroStr)) {
+                        if (String(item.numero_ordem).toLowerCase().includes(numeroStr)) {
                             resultados.push({
                                 setor: setor,
                                 tipo: tipo,
                                 item: item,
-                                ordem: item.ordem,
+                                ordem: item.numero_ordem,
                                 sequencia: item.sequencia,
                                 operacao: item.operacao,
                                 codigo: item.codigo,
@@ -433,11 +433,11 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('[LOG mudarStatus] Não encontrou info detalhada', { setor, ordem, sequencia, operacao });
             return;
         }
-        const { tipo: tipoAtual } = info;
+        const { tipo: tipoAtual, item } = info;
         if (tipoAtual === novoStatus) return;
 
         try {
-            await apiMudarStatus(ordem, sequencia, operacao, setor, tipoAtual, novoStatus);
+            await apiMudarStatus(ordem, sequencia, operacao, setor, tipoAtual, novoStatus, item.posicao_fila);
             fecharModal();
             await carregarDados();
         } catch (error) {
@@ -524,6 +524,10 @@ document.addEventListener('DOMContentLoaded', () => {
     window.salvarMudancaSetor = async (setorOrigem, ordem, sequencia, operacao) => {
         const setorDestino = document.getElementById('setor-destino').value;
         if (!setorDestino) return;
+        // Log para depuração
+        console.log('[MOVIMENTAÇÃO] Enviando:', {
+            setorOrigem, ordem, sequencia, operacao, setorDestino
+        });
         try {
             await moverOrdemParaSetor(setorOrigem, ordem, sequencia, operacao, setorDestino);
             alert(`Ordem movida para ${setorDestino.toUpperCase()}!`);
@@ -651,8 +655,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div><strong>Quantidade:</strong> ${item.qtde}</div>
                 </div>
 
-                <div class="modal-section">
-                    <h3>Separação</h3>
+                <div class="modal-section modal-status-highlight" style="background:#ffe9b3;border:2px solid #ffb300;padding:12px;margin-bottom:16px;border-radius:8px;">
+                    <h3 style="color:#ff9800;margin-top:0;">Status</h3>
+                    <div class="form-group">
+                        <label for="status-select" style="font-weight:bold;color:#ff9800;">Atualizar status</label>
+                        <select id="status-select">${statusOptions}</select>
+                    </div>
+                    <button class="modal-action-btn" style="background:#ffb300;color:#fff;font-weight:bold;" onclick="confirmarMudancaStatus('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Atualizar status</button>
+                    <div class="modal-subsection">
+                        <h4>Linha do tempo</h4>
+                        ${historicoStatusHtml}
+                    </div>
+                </div>
+
+                <div class="modal-section modal-separacao-highlight" style="background:#e3f7d7;border:2px solid #4caf50;padding:12px;margin-bottom:16px;border-radius:8px;">
+                    <h3 style="color:#388e3c;margin-top:0;">Separação</h3>
                     ${separacaoEstadoHtml}
                     <div class="modal-actions-row">
                         ${separacaoAcoesHtml}
@@ -663,39 +680,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
 
-                <div class="modal-section">
-                    <h3>Comentários</h3>
+                <div class="modal-section modal-comentarios-highlight" style="background:#e3e9ff;border:2px solid #3f51b5;padding:12px;margin-bottom:16px;border-radius:8px;">
+                    <h3 style="color:#303f9f;margin-top:0;">Comentários</h3>
                     ${comentariosHtml}
                     <div class="form-group">
                         <label for="novo-comentario">Novo comentário</label>
                         <textarea id="novo-comentario" rows="3" placeholder="Digite o comentário"></textarea>
                     </div>
-                    <button class="modal-action-btn" onclick="salvarComentario('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Adicionar</button>
+                    <button class="modal-action-btn" style="background:#3f51b5;color:#fff;font-weight:bold;" onclick="salvarComentario('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Adicionar</button>
                 </div>
 
-                <div class="modal-section">
-                    <h3>Movimentações</h3>
+                <div class="modal-section modal-mov-highlight" style="background:#fff3e3;border:2px solid #ff9800;padding:12px;margin-bottom:16px;border-radius:8px;">
+                    <h3 style="color:#ff9800;margin-top:0;">Movimentações</h3>
                     <div class="form-group">
                         <label for="setor-destino">Mover para outro setor</label>
                         <select id="setor-destino">${setoresDisponiveis}</select>
                     </div>
-                    <button class="modal-action-btn" onclick="salvarMudancaSetor('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Mover ordem</button>
+                    <button class="modal-action-btn" style="background:#ff9800;color:#fff;font-weight:bold;" onclick="salvarMudancaSetor('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Mover ordem</button>
                     <div class="modal-subsection">
                         <h4>Histórico de movimentações</h4>
                         ${historicoMovHtml}
-                    </div>
-                </div>
-
-                <div class="modal-section">
-                    <h3>Status</h3>
-                    <div class="form-group">
-                        <label for="status-select">Atualizar status</label>
-                        <select id="status-select">${statusOptions}</select>
-                    </div>
-                    <button class="modal-action-btn" onclick="confirmarMudancaStatus('${setor}', '${ordem}', ${item.sequencia}, '${item.operacao}')">Atualizar status</button>
-                    <div class="modal-subsection">
-                        <h4>Linha do tempo</h4>
-                        ${historicoStatusHtml}
                     </div>
                 </div>
             `;
@@ -904,7 +908,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.warn('[DATA DEBUG] posicao_fila não existe para item:', item);
                 }
                 return `
-                    <tr class="${rowClass}" data-ordem="${item.numero_ordem}" data-sequencia="${item.sequencia}" data-operacao="${item.operacao}">
+                    <tr class="${rowClass}" data-id="${item.id}" data-posicao-fila="${item.posicao_fila}" data-ordem="${item.numero_ordem}" data-sequencia="${item.sequencia}" data-operacao="${item.operacao}">
                         <td>${dataFila}${infoExtraHtml}</td>
                         <td>${item.numero_ordem}</td>
                         <td>${item.sequencia}</td>
@@ -919,6 +923,41 @@ document.addEventListener('DOMContentLoaded', () => {
                     </tr>
                 `;
             }).join('');
+
+            // Inicializa o SortableJS na tabela
+            new Sortable(tbody, {
+                animation: 150,
+                onEnd: async (evt) => {
+                    const itemArrastado = evt.item;
+                    const id = itemArrastado.dataset.id;
+                    const itemSeguinte = itemArrastado.nextElementSibling;
+                    const itemAnterior = itemArrastado.previousElementSibling;
+                    
+                    let novaData;
+
+                    if (itemSeguinte) {
+                        // Se há um item seguinte, a nova data é 1 minuto antes dele
+                        const dataSeguinte = new Date(itemSeguinte.dataset.posicaoFila);
+                        novaData = new Date(dataSeguinte.getTime() - 60000); // Subtrai 1 minuto
+                    } else if (itemAnterior) {
+                        // Se for movido para o final, a nova data é 1 minuto depois do anterior
+                        const dataAnterior = new Date(itemAnterior.dataset.posicaoFila);
+                        novaData = new Date(dataAnterior.getTime() + 60000); // Adiciona 1 minuto
+                    } else {
+                        // Se for o único item na lista, não faz nada
+                        return;
+                    }
+
+                    try {
+                        itemArrastado.style.backgroundColor = '#fdffab'; // Feedback visual
+                        await apiSalvarPosicaoFila(id, novaData.toISOString());
+                        await carregarDados(); // Recarrega para confirmar a nova ordem
+                    } catch (error) {
+                        alert('Erro ao salvar a nova posição: ' + error.message);
+                        itemArrastado.style.backgroundColor = ''; // Reverte o feedback
+                    }
+                }
+            });
         };
 // ========== MODAL DE DEMANDAS ==========
 window.abrirDemandas = async function(numero_ordem, sequencia) {
@@ -1119,6 +1158,7 @@ window.requisitarDemandas = async function(numero_ordem, sequencia) {
      * Carrega dados com Roteamento Inteligente, priorizando movimentações manuais.
      */
 async function carregarDados() {
+    window.carregarDados = carregarDados;
     console.log('🔄 Carregando dados com Roteamento Inteligente...');
     try {
         // 1. Limpar dados existentes

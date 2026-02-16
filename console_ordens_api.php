@@ -17,7 +17,7 @@ try {
     while (true) {
         // Sintaxe de alias correta para PostgREST (Supabase): 'novo_nome:nome_original'
         // Inclui o campo posicao_fila (timestampz) no select
-        $select_fields = 'numero_ordem:num_ordem,sequencia:primeira_seq_pendente,operacao:operacao_pend,setor:setor_atual,cliente,cod_item,qtde,dt_entrega,posicao_fila';
+        $select_fields = 'id,numero_ordem:num_ordem,sequencia:primeira_seq_pendente,operacao:operacao_pend,setor:setor_atual,cliente,cod_item,qtde,dt_entrega,posicao_fila';
         // Ordena por posicao_fila se disponível, senão por dt_entrega
         $query = "select={$select_fields}&order=posicao_fila.desc.nullslast,dt_entrega.desc&limit={$limit}&offset={$offset}";
         $lote = $supabase->select('ordens_pendentes', $query);
