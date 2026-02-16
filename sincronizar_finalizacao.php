@@ -1,4 +1,3 @@
-echo json_encode(['success' => true, 'message' => 'Sincronização concluída.']);
 <?php
 // sincronizar_finalizacao.php
 // Sincroniza o campo Final da tabela historico_status com o status do Oracle

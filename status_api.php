@@ -22,7 +22,7 @@ try {
         elseif (!empty($setor)) {
             // Usa a view 'latest_status_by_order' que já faz o trabalho de pegar o último status
             // A view precisa ser ajustada no Supabase para incluir os campos adicionais
-            $select_fields = 'numero_ordem,sequencia,operacao,setor,status_novo,data_finalizacao,cliente,cod_item,qtde,dt_entrega,posicao_fila';
+            $select_fields = 'id,numero_ordem,sequencia,operacao,setor,status_novo,data_finalizacao,cliente,cod_item,qtde,dt_entrega,posicao_fila';
             if ($setorLower === 'all') {
                 $query = "select={$select_fields}";
                 $response['data'] = $supabase->select('latest_status_by_order', $query);
@@ -39,7 +39,6 @@ try {
     // POST: Insere um novo log de movimentação de status
     elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true);
-        
         $data = [
             'numero_ordem' => $input['numero_ordem'] ?? null,
             'sequencia' => $input['sequencia'] ?? null,
@@ -47,7 +46,13 @@ try {
             'setor' => $input['setor'] ?? null,
             'status_anterior' => $input['status_anterior'] ?? null,
             'status_novo' => $input['status_novo'] ?? null,
-            'colaborador' => $_SESSION['nome_completo'] ?? 'N/A',
+            'colaborador' => $_SESSION['nome_completo'] ?? ($input['colaborador'] ?? 'N/A'),
+            'posicao_fila' => $input['posicao_fila'] ?? null,
+            // Novos campos para ordens manuais
+            'cliente' => $input['cliente'] ?? 'Projetos/Dispositivos',
+            'cod_item' => $input['cod_item'] ?? null,
+            'qtde' => $input['qtde'] ?? null,
+            'dt_entrega' => $input['dt_entrega'] ?? null
         ];
 
         if (empty($data['numero_ordem']) || empty($data['setor']) || empty($data['status_novo'])) {
@@ -57,6 +62,25 @@ try {
         $response['data'] = $supabase->insert('historico_status', $data);
         $response['success'] = true;
         $response['message'] = 'Status atualizado com sucesso.';
+    
+    } 
+    // PATCH: Atualiza a data/hora da posição na fila para uma entrada específica
+    elseif ($_SERVER['REQUEST_METHOD'] === 'PATCH') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $id = $input['id'] ?? null;
+        $posicao_fila = $input['posicao_fila'] ?? null;
+
+        if (empty($id) || empty($posicao_fila)) {
+            throw new Exception('ID da linha e nova data/hora são obrigatórios.');
+        }
+
+        $updateData = ['posicao_fila' => $posicao_fila];
+        $where = "id=eq.{$id}";
+        
+        $response['data'] = $supabase->update('historico_status', $updateData, $where);
+        $response['success'] = true;
+        $response['message'] = 'Posição na fila atualizada com sucesso.';
+
     } else {
         throw new Exception('Método não permitido.');
     }
